@@ -1,0 +1,20 @@
+{
+  "name": "com.catcode.uniloop",
+  "version": "1.0.0",
+  "displayName": "UniLoop",
+  "description": "Low‑level Unity PlayerLoop scheduler with zero allocations, handle‑based control, and CancellationToken support",
+  "unity": "2021.3",
+  "author": {
+    "name": "CatCode",
+    "url": "https://github.com/CatCodeGames"
+  },
+  "license": "MIT",
+  "keywords": [
+    "uniloop",
+    "playerloop",
+    "performance",
+    "zero-allocation",
+    "update"
+  ],
+  "dependencies": {}
+}

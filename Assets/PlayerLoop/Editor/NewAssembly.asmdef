@@ -1,0 +1,16 @@
+{
+    "name": "UniLoop.Editor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:e1a74f04720880a4886fae4631240f92"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
