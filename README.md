@@ -1,6 +1,6 @@
 ## UniLoop
 
-`UniLoop` provides high-perfowrmance C# logic execution directly within the Unity **PlayerLoop**, completely bypassing the need for MonoBehaviour.
+`UniLoop` provides high-performance C# logic execution directly within the Unity **PlayerLoop**, completely bypassing the need for MonoBehaviour.
 
 * Update outside MonoBehaviour — Run cyclic logic in pure C# classes and services without scene objects.
 * Zero Allocation — No heap allocations during task registration, execution, or completion.
@@ -82,7 +82,7 @@ using (var handle = UniLoop.Update.Loop.Schedule(() => Debug.Log("Tick")))
 
 ## Architecture and API
 
-`UniLoop` acts as a unified entry point for running logic within the Unity PlayerLoop by combining **Timings**, **Phases**, and **Process Types**.
+`UniLoop` acts as a unified entry point for running logic within the Unity PlayerLoop by combining **Timings**, **Phases** and **Process Types**.
 
 ### Process Types
 - `Loop` (Infinite cycle) — Executes every frame until manually stopped or cancelled via a token.
