@@ -25,11 +25,10 @@ namespace CatCode.PlayerLoops
         public void Run()
         {
             _denseArray.ApplyAdd();
+            _denseArray.ApplyRemove();
 
             for (int i = 0; i < _denseArray.Count; i++)
                 _denseArray[i]();
-
-            _denseArray.ApplyRemove();
         }
 
 
