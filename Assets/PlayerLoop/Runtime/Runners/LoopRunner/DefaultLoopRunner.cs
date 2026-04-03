@@ -68,7 +68,8 @@ namespace CatCode.PlayerLoops
         {
             _denseArray.ApplyAdd();
 
-            for (int i = 0; i < _denseArray.Count; i++)
+            var count = _denseArray.Count;
+            for (int i = 0; i < count; i++)
             {
                 var element = _denseArray[i];
                 if (element.isCancellationRequested)

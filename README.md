@@ -4,6 +4,7 @@
 
 * Update outside MonoBehaviour — Run cyclic logic in pure C# classes and services without scene objects.
 * Zero Allocation — No heap allocations during task registration, execution, or completion.
+* No Performance Spikes — Predictable load without spikes at any stage of the task lifecycle.
 * Max Performance — Low-level injection directly into the PlayerLoop systems.
 * Safe Modification — Add or remove tasks safely during the loop iteration.
 * Deterministic Order — Tasks are executed strictly in the order they were registered.
@@ -244,7 +245,7 @@ Each frame, 100 new processes were started (lifetime ~1 sec).
 #### Registration (Start)
 
 
-|             | Creation (ms) | Speed (%)    | Alloc (KB)   |
+|             | Time (ms) | Speed (%)    | Alloc (KB)   |
 |-------------------|--------------:|-------------:|-------------:|
 | Update (Baseline)| 0.31      | 100%     | 28.1     |
 | **UniLoop (Default)** | **0.64**          | **47%**          | **28.1**         |
@@ -256,11 +257,11 @@ Each frame, 100 new processes were started (lifetime ~1 sec).
 #### Execution (Update)
 
 
-|             | Update (ms)   | Speed (%)    | Alloc (KB)  |
+|             | Time (ms)   | Speed (%)    | Alloc (KB)  |
 |-------------------|--------------:|-------------:|-------------:|
 | Update (Baseline)| 2.02      | 100%     | 0      |
-| **UniLoop (Default)** | 2.05          | 99%          | 0          |
-| **UniLoop (NoAlloc)** | 2.05          | 99%          | 0          |
+| **UniLoop (Default)** | **2.05**          | **99%**          | **0**          |
+| **UniLoop (NoAlloc)** | **2.05**          | **99%**          | **0**          |
 | WaitUntil         | 2.12          | 95%          | 0          |
 | Coroutine         | 3.18          | 63%          | 0          |
 | UniTask (Yield)   | 6.49          | 31%          | 0          |
@@ -272,18 +273,42 @@ Each frame, 100 new processes were started (lifetime ~1 sec).
 `UniLoop` (NoAlloc) supports **Generic State Passing**, which eliminates **closures** and **boxing**. Combined with cached method references, this ensures **zero allocations** in the hot execution loop.
 </details>
 
----
+#### Cancellation
 
-### Honest Conclusion
+|                   | Time (ms) | Speed (%) | Alloc (KB) |
+|-------------------|-----------------:|-------------:|----------------:|
+| Coroutine         | 6.26             |122          | 0             |
+| Update (Baseline)  | 7.64             |100          | 0             |
+| **UniLoop (Default)** | **7.69**          |**99**          | 0          | 
+| UniTask (Yield)   | 8.87             |86          | 0             |
+| **UniLoop (NoAlloc)** | **12.01**          |**63**          | 0          |
+| UniTask (WaitUntil) | 36.62 	       |20		       | 1.1Mb 	       |
 
-Strictly looking at the numbers:
-- Execution Speed: `UniLoop` is on par with a raw `Update` loop and significantly faster than Coroutines or `UniTask` for mass updates.
-- Registration Cost: Starting a task requires more CPU than a simple `HashSet.Add`, primarily due to internal pooling logic.
 
-**What you get in return:**
-- **Guaranteed execution order** for all tasks.
-- **Modern management** via `IDisposable` or `CancellationToken`.
-- **Total elimination of heap allocations.**
+<details>
+  <summary>Test Details</summary> 
+When using `UniTask.WaitUntil`, cancelling 2,500 tasks triggers the generation of 2,500 `OperationCanceledException` instances. This causes a memory spike and high CPU load due to **Stack Trace** generation for each exception.
+</details>
+
+
+### Conclusion
+
+* **Registration** — CPU overhead is comparable to starting a Coroutine or UniTask. Costs are due to handle preparation and internal pooling.
+* **Execution** — Runs at the speed of the native `Update` loop. Significantly outperforms Coroutines and UniTask under high PlayerLoop load.
+* **Completion & Cancellation** — No performance spikes. Predictable system behavior even when stopping thousands of tasks simultaneously.
+
+#### UniLoop vs UniTask (WaitUntil)
+Both tools share the same core mechanic — executing logic within the PlayerLoop. However, an async operation is required by standard to throw an exception upon cancellation. Under mass termination, this inevitably leads to an "exception flood," FPS drops, and memory spikes.
+
+`UniLoop` implements an **Exception-Free** cancellation mechanism, ensuring zero allocations during task completion and cancellation.
+
+#### Key Advantages:
+* Guaranteed execution orde within the frame.
+* Zero-Alloc Suppor — ability to run without allocations throughout the entire task lifecycle.
+* Flexible contro via `IDisposable` handles or `CancellationToken`.
+* No performance spike at any stage of the task lifecycle.
+
+
 
 ## Installation
 

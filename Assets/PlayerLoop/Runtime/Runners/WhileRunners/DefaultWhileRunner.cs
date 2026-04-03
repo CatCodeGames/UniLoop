@@ -51,12 +51,12 @@ namespace CatCode.PlayerLoops
         }
 
         private readonly ObjectPool<Entry> _pool;
-        private readonly DeferredDenseArray<Entry> _denseArray;
+        private readonly DeferredDenseArrayFast<Entry> _denseArray;
         private readonly Queue<FinishedEntry> _finishedQueue;
 
         public DefaultWhileRunner(int startSize = 32, int growSize = 32)
         {
-            _denseArray = new DeferredDenseArray<Entry>(startSize, growSize);
+            _denseArray = new DeferredDenseArrayFast<Entry>(startSize, growSize);
             _pool = new ObjectPool<Entry>(
                 createFunc: () => new(),
                 actionOnRelease: item => item.Release(),
@@ -81,7 +81,7 @@ namespace CatCode.PlayerLoops
         public void SetOnCompleted<T>(ElementHandle handle, Action<T> onCompleted, T state)
             => _denseArray[handle].onCompletedState = StatefulCallback<T>.Get(onCompleted, state);
         public void SetOnCanceled(ElementHandle handle, Action onCanceled)
-            => _denseArray[handle].onCompleted = onCanceled;
+            => _denseArray[handle].onCanceled = onCanceled;
         public void SetOnCanceled<T>(ElementHandle handle, Action<T> onCanceled, T state)
             => _denseArray[handle].onCanceledState = StatefulCallback<T>.Get(onCanceled, state);
 
@@ -90,7 +90,8 @@ namespace CatCode.PlayerLoops
         {
             _denseArray.ApplyAdd();
 
-            for (int i = 0; i < _denseArray.Count; i++)
+            var count = _denseArray.Count;
+            for (int i = 0; i < count; i++)
             {
                 var element = _denseArray[i];
                 if (element.isCancellationRequested)

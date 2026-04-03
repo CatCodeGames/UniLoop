@@ -39,6 +39,7 @@ namespace CatCode.Collections
         public int TotalCount => _count + _pendingAdd.Count;
 
         public T this[int index] => _entries[index].Element;
+
         public T this[ElementHandle handle] => handle.IsPendingAdd
             ? _pendingAdd[handle.Index].Element
             : _entries[handle.Index].Element;
@@ -153,9 +154,15 @@ namespace CatCode.Collections
 
             while (rangeStartIndex < _count)
             {
-                while (rangeStartIndex < _count && span[rangeStartIndex].Handle.IsPendingRemove)
+                while (rangeStartIndex < _count)
                 {
-                    _handlesPool.Release(span[rangeStartIndex].Handle);
+                    ref var entry = ref span[rangeStartIndex];
+                    var handle = entry.Handle;
+
+                    if (!handle.IsPendingRemove)
+                        break;
+
+                    _handlesPool.Release(handle);
                     rangeStartIndex++;
                 }
 
@@ -163,7 +170,13 @@ namespace CatCode.Collections
                 var realIndex = lastLiveIndex;
                 while (rangeEndIndex < _count && !span[rangeEndIndex].Handle.IsPendingRemove)
                 {
-                    span[rangeEndIndex].Handle.Index = realIndex;
+                    ref var entry = ref span[rangeEndIndex];
+                    var handle = entry.Handle;
+
+                    if (handle.IsPendingRemove)
+                        break;
+
+                    handle.Index = realIndex;
                     rangeEndIndex++;
                     realIndex++;
                 }
