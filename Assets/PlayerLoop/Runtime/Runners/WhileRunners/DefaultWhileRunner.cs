@@ -51,12 +51,12 @@ namespace CatCode.PlayerLoops
         }
 
         private readonly ObjectPool<Entry> _pool;
-        private readonly DeferredDenseArrayFast<Entry> _denseArray;
+        private readonly DeferredDenseArray<Entry> _denseArray;
         private readonly Queue<FinishedEntry> _finishedQueue;
 
         public DefaultWhileRunner(int startSize = 32, int growSize = 32)
         {
-            _denseArray = new DeferredDenseArrayFast<Entry>(startSize, growSize);
+            _denseArray = new DeferredDenseArray<Entry>(startSize, growSize);
             _pool = new ObjectPool<Entry>(
                 createFunc: () => new(),
                 actionOnRelease: item => item.Release(),
