@@ -1,8 +1,9 @@
-﻿namespace CatCode.PlayerLoops
-{
+﻿using CatCode.Collections;
 
-     
-    public interface ILoopController : ILoopRegistry, ILoopCanceller
+namespace CatCode.PlayerLoops
+{     
+    public interface ILoopController : ILoopRegistry
     {
+        void Cancel(ElementHandle handle);
     }
 }

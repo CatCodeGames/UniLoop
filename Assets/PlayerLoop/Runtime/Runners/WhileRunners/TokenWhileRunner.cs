@@ -40,7 +40,7 @@ namespace CatCode.PlayerLoops
                 onCompletedState = null;
                 onCanceledState?.Release();
                 onCanceledState = null;
-            }
+            }    
         }
 
         private struct FinishedEntry
@@ -62,7 +62,7 @@ namespace CatCode.PlayerLoops
 
         public TokenWhileRunner(int startSize = 32, int growSize = 32)
         {
-            _denseArray = new DeferredDenseArray<Entry>(startSize, growSize);
+            _denseArray = new DeferredDenseArray<Entry>(startSize);
             _pool = new ObjectPool<Entry>(
                 createFunc: () => new(),
                 actionOnRelease: item => item.Release(),
@@ -135,5 +135,8 @@ namespace CatCode.PlayerLoops
 
         public RunnerMetrics GetMetrics()
             => new(_denseArray.Count, _denseArray.PendingCount, _denseArray.TotalCount);
+
+        public bool IsValid(ElementHandle handle)
+            =>_denseArray.IsValid(handle);
     }
 }

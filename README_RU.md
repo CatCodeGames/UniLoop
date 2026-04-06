@@ -94,7 +94,15 @@ using (var handle = UniLoop.Update.Loop.Schedule(() => Debug.Log("Tick")))
 Выбор конкретного момента в игровом цикле Unity:
 - `PlayerLoopTiming` - выбор игрового цикла: Update, FixedUpdate, LateUpdate 
 - `PlayerLoopPhase` - в начале или конце цикла: Early/Late
-
+  
+### Порядок выполнения
+Очередность выполнения типов операций в пределах одной фазы:
+- Slim Loop - Легкий цикл. В отличие от остальных типов, модификация коллекции (добавление/удаление) во время итерации не безопасна.
+- Loop - Бесконечный цикл.
+- Loop (with CancellationToken) - Бесконечный цикл с поддержкой CancellationToken.
+- While - Цикл по условию.
+- While (with CancellationToken) - Цикл по условию с поддержкой CancellationToken.
+  
 ### Способы запуска 
 
 - **Fluent API**: — последовательный выбор через цепочку:   

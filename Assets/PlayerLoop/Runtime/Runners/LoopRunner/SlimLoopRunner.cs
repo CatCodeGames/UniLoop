@@ -6,13 +6,13 @@ namespace CatCode.PlayerLoops
     /// <summary>
     /// Minimal runner for PlayerLoop actions; not safe to cancel tasks during execution.
     /// </summary>
-    internal sealed class SlimLoopRunner : ILoopCanceller
+    internal sealed class SlimLoopRunner : ISlimLoopContoller
     {
         private readonly DeferredDenseArray<Action> _denseArray;
 
-        public SlimLoopRunner(int startSize, int growSize)
+        public SlimLoopRunner(int capacity)
         {
-            _denseArray = new DeferredDenseArray<Action>(startSize, growSize);
+            _denseArray = new DeferredDenseArray<Action>(capacity);
         }
 
         public ElementHandle Add(Action action)
@@ -28,10 +28,12 @@ namespace CatCode.PlayerLoops
             _denseArray.ApplyRemove();
 
             var count = _denseArray.Count;
-            for (int i = 0; i < count ; i++)
+            for (int i = 0; i < count; i++)
                 _denseArray[i]();
         }
 
+        public bool IsValid(ElementHandle handle)
+            => _denseArray.IsValid(handle);
 
         public RunnerMetrics GetMetrics()
             => new(_denseArray.Count, _denseArray.PendingCount, _denseArray.TotalCount);

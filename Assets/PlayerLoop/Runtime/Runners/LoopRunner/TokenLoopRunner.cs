@@ -19,11 +19,11 @@ namespace CatCode.PlayerLoops
             public Action onCanceled;
             public IStatefulCallback onCanceledState;
 
-
             public void Init(Action action, CancellationToken cancellationToken)
             {
                 this.action = action;
                 this.cancellationToken = cancellationToken;
+
             }
 
             public void Release()
@@ -41,9 +41,9 @@ namespace CatCode.PlayerLoops
         private readonly Queue<Entry> _finishedQueue;
         private readonly ObjectPool<Entry> _pool;
 
-        public TokenLoopRunner(int startSize = 32, int growSize = 32)
+        public TokenLoopRunner(int startSize = 32)
         {
-            _denseArray = new DeferredDenseArray<Entry>(startSize, growSize);
+            _denseArray = new DeferredDenseArray<Entry>(startSize);
             _pool = new ObjectPool<Entry>(
                 createFunc: () => new(),
                 actionOnRelease: item => item.Release(),
@@ -95,6 +95,8 @@ namespace CatCode.PlayerLoops
             }
             _finishedQueue.Clear();
         }
+
+        public bool IsValid(ElementHandle handle) => _denseArray.IsValid(handle);
 
         public RunnerMetrics GetMetrics()
             => new(_denseArray.Count, _denseArray.PendingCount, _denseArray.TotalCount);

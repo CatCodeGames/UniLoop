@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using UnityEngine.Pool;
 
 namespace CatCode.Collections
 {
@@ -10,136 +9,146 @@ namespace CatCode.Collections
     /// </summary>
     public sealed class DeferredDenseArray<T>
     {
-        private struct Entry
+        private struct HandleSlot
         {
-            public T Element;
-            public ElementHandle Handle;
+            public int denseIndex;
+            public int generation;
+            public bool isPendingAdd;
 
-            public Entry(T element, ElementHandle handle)
+            public HandleSlot(int index)
             {
-                Element = element;
-                Handle = handle;
+                denseIndex = index;
+                generation = 0;
+                isPendingAdd = false;
             }
         }
 
-        private bool _addRequested;
-        private bool _removeRequested;
+        private struct DenseEntry
+        {
+            public T element;
+            public int slotID;
+            public bool isPendingRemove;
+
+            public DenseEntry(T element, int slotID)
+            {
+                this.element = element;
+                this.slotID = slotID;
+                isPendingRemove = false;
+            }
+        }
+
+        private bool _hasPendingAdd;
+        private bool _hasPendingRemove;
 
         private int _count;
         private int _size;
-        private Entry[] _entries;
 
-        private readonly int _growSize;
-        private readonly IObjectPool<ElementHandle> _handlesPool;
+        private DenseEntry[] _entries;
+        private HandleSlot[] _slots;
 
-        private readonly List<Entry> _pendingAdd = new();
+        private int[] _freeIDs;
+        private int _freeTop;
+
+        private readonly List<DenseEntry> _pendingAdds = new();
 
         public int Count => _count;
-        public int PendingCount => _pendingAdd.Count;
-        public int TotalCount => _count + _pendingAdd.Count;
+        public int PendingCount => _pendingAdds.Count;
+        public int TotalCount => _pendingAdds.Count + _count;
 
-        public T this[int index] => _entries[index].Element;
+        public T this[int index] => _entries[index].element;
 
-        public T this[ElementHandle handle] => handle.IsPendingAdd
-            ? _pendingAdd[handle.Index].Element
-            : _entries[handle.Index].Element;
+        public T this[ElementHandle handle]
+        {
+            get
+            {
+                var id = handle.id;
+                ref var slot = ref _slots[id];
+                var index = slot.denseIndex;
+                if (slot.isPendingAdd)
+                    return _pendingAdds[index].element;
+                else
+                    return _entries[index].element;
+            }
+        }
 
-        public DeferredDenseArray(int startSize, int growSize)
+        public DeferredDenseArray(int startSize)
         {
             _size = startSize;
-            _growSize = growSize;
+            _entries = new DenseEntry[startSize];
+            _slots = new HandleSlot[startSize];
+            _freeIDs = new int[startSize];
+            for (int i = 0; i < startSize; i++)
+            {
+                _slots[i] = new HandleSlot(i);
+                _freeIDs[_count] = i;
+                _count++;
+            }
+            _freeTop = startSize;
+            _count = 0;
+        }
 
-            _entries = new Entry[_size];
 
-            _handlesPool = new ObjectPool<ElementHandle>(
-                createFunc: () => new(),
-                actionOnRelease: instance => instance.Reset(),
-                collectionCheck: false,
-                defaultCapacity: startSize);
+        private int AllocateID()
+        {
+            if (_freeTop == 0)
+                Resize();
 
-
-            _pendingAdd.Capacity = startSize;
+            _freeTop--;
+            return _freeIDs[_freeTop];
         }
 
         public ElementHandle Add(T item)
         {
-            _addRequested = true;
+            _hasPendingAdd = true;
 
-            var handle = _handlesPool.Get();
+            int slotID = AllocateID();
+            ref var slot = ref _slots[slotID];
 
-            handle.Index = _pendingAdd.Count;
-            handle.IsPendingAdd = true;
+            slot.denseIndex = _pendingAdds.Count;
+            slot.isPendingAdd = true;
 
-            var entry = new Entry(item, handle);
-            _pendingAdd.Add(entry);
+            var pending = new DenseEntry(item, slotID);
+            _pendingAdds.Add(pending);
 
-            return handle;
-        }
-
-        public bool Remove(ElementHandle handle)
-        {
-            if (handle.IsPendingRemove)
-                return false;
-
-            _removeRequested = true;
-
-            handle.IsPendingRemove = true;
-            handle.Generation++;
-
-            return true;
-        }
-
-        public void RemoveAt(int index)
-        {
-            var handle = _entries[index].Handle;
-            Remove(handle);
-        }
-
-
-        public void ApplyChanges()
-        {
-            ApplyAdd();
-            ApplyRemove();
+            return new ElementHandle(slotID, slot.generation);
         }
 
         public void ApplyAdd()
         {
-            if (!_addRequested)
+            if (!_hasPendingAdd)
                 return;
-            _addRequested = false;
+            _hasPendingAdd = false;
 
-            var newCount = _count + _pendingAdd.Count;
-            if (newCount > _size)
-            {
-                _size = (newCount / _growSize + 1) * _growSize;
-                Array.Resize(ref _entries, _size);
-            }
-
-            var count = _pendingAdd.Count;
+            var count = _pendingAdds.Count;
             for (int i = 0; i < count; i++)
             {
-                var entry = _pendingAdd[i];
-                var handle = entry.Handle;
+                var entry = _pendingAdds[i];
+                var slotID = entry.slotID;
 
-                if (handle.IsPendingRemove)
-                {
-                    _handlesPool.Release(handle);
-                    continue;
-                }
-                handle.Index = _count;
-                handle.IsPendingAdd = false;
-
+                ref var slot = ref _slots[slotID];
+                slot.isPendingAdd = false;
+                slot.denseIndex = _count;
                 _entries[_count] = entry;
                 _count++;
             }
-            _pendingAdd.Clear();
+
+            _pendingAdds.Clear();
+        }
+
+        public void Remove(ElementHandle handle)
+        {
+            _hasPendingRemove = true;
+
+            var denseIndex = _slots[handle.id].denseIndex;
+            ref var entry = ref _entries[denseIndex];
+            entry.isPendingRemove = true;
         }
 
         public void ApplyRemove()
         {
-            if (!_removeRequested)
+            if (!_hasPendingRemove)
                 return;
-            _removeRequested = false;
+            _hasPendingRemove = false;
 
             var span = _entries.AsSpan(0, _count);
 
@@ -147,36 +156,43 @@ namespace CatCode.Collections
             int rangeStartIndex;
             int rangeEndIndex;
 
-            while (lastLiveIndex < _count && !span[lastLiveIndex].Handle.IsPendingRemove)
+            while (lastLiveIndex < _count && !_entries[lastLiveIndex].isPendingRemove)
                 lastLiveIndex++;
 
             rangeStartIndex = lastLiveIndex;
 
             while (rangeStartIndex < _count)
             {
+
                 while (rangeStartIndex < _count)
                 {
                     ref var entry = ref span[rangeStartIndex];
-                    var handle = entry.Handle;
-
-                    if (!handle.IsPendingRemove)
+                    if (!entry.isPendingRemove)
                         break;
 
-                    _handlesPool.Release(handle);
+                    var slotID = span[rangeStartIndex].slotID;
+
+                    _slots[slotID].generation++;
+                    _slots[slotID].denseIndex = -1;
+
+                    _freeIDs[_freeTop] = slotID;
+                    _freeTop++;
+
                     rangeStartIndex++;
                 }
 
                 rangeEndIndex = rangeStartIndex;
                 var realIndex = lastLiveIndex;
-                while (rangeEndIndex < _count && !span[rangeEndIndex].Handle.IsPendingRemove)
+
+                while (rangeEndIndex < _count)
                 {
                     ref var entry = ref span[rangeEndIndex];
-                    var handle = entry.Handle;
-
-                    if (handle.IsPendingRemove)
+                    if (entry.isPendingRemove)
                         break;
 
-                    handle.Index = realIndex;
+                    var slotID = span[rangeEndIndex].slotID;
+                    _slots[slotID].denseIndex = realIndex;
+
                     rangeEndIndex++;
                     realIndex++;
                 }
@@ -187,7 +203,52 @@ namespace CatCode.Collections
                 lastLiveIndex += (rangeEndIndex - rangeStartIndex);
                 rangeStartIndex = rangeEndIndex;
             }
+
+            Array.Clear(_entries, lastLiveIndex, _count - lastLiveIndex);
             _count = lastLiveIndex;
+        }
+
+        private void Resize()
+        {
+            var newCount = _count + _pendingAdds.Count;
+            if (newCount < _size)
+                return;
+
+            _size = (_size > int.MaxValue / 2)
+                ? int.MaxValue
+                : _size * 2;
+
+            Array.Resize(ref _entries, _size);
+            Array.Resize(ref _slots, _size);
+            Array.Resize(ref _freeIDs, _size);
+
+            for (int i = newCount; i < _size; i++)
+            {
+                _slots[i] = new HandleSlot(i);
+                _freeIDs[_freeTop] = i;
+                _freeTop++;
+            }
+        }
+
+
+        public void ApplyChanges()
+        {
+            ApplyAdd();
+            ApplyRemove();
+        }
+
+        public bool IsValid(ElementHandle handle)
+        {
+            ref var slot = ref _slots[handle.id];
+            return slot.generation == handle.generation;
+        }
+
+        public void RemoveAt(int i)
+        {
+            _hasPendingRemove = true;
+
+            ref var entry = ref _entries[i];
+            entry.isPendingRemove = true;
         }
     }
 }

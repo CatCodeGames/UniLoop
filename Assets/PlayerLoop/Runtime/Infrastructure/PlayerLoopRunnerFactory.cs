@@ -5,17 +5,16 @@
     /// </summary>
     internal static class PlayerLoopRunnerFactory
     {
-        public const int StartSize = 64;
-        public const int GrowSize = 64;
+        public const int Capacity = 64;
 
         public static PlayerLoopRunner Create()
         {
             return new PlayerLoopRunner(
-                new SlimLoopRunner(StartSize, GrowSize),
-                new DefaultLoopRunner(StartSize, GrowSize),
-                new TokenLoopRunner(StartSize, GrowSize),
-                new DefaultWhileRunner(StartSize, GrowSize),
-                new TokenWhileRunner(StartSize, GrowSize));
+                new SlimLoopRunner(Capacity),
+                new DefaultLoopRunner(Capacity),
+                new TokenLoopRunner(Capacity),
+                new DefaultWhileRunner(Capacity),
+                new TokenWhileRunner(Capacity));
         }
     }
 }

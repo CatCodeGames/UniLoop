@@ -10,23 +10,13 @@ namespace CatCode.PlayerLoops
     {
         private readonly IWhileRegistry _runner;
         private readonly ElementHandle _handle;
-        private readonly uint _handleGeneration;
-       
-        public bool IsDisposed
-        {
-            get
-            {
-                if (_handle == null)
-                    return true;
-                return _handle.Generation != _handleGeneration;
-            }
-        }
+
+        public bool IsDisposed => _runner == null || !_runner.IsValid(_handle);
 
         public TokenWhileHandle(IWhileRegistry runner, ElementHandle handle) : this()
         {
             _runner = runner;
             _handle = handle;
-            _handleGeneration = handle.Generation;
         }
 
 

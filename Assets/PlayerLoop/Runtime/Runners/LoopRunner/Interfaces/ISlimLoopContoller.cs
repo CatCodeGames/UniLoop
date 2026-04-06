@@ -2,8 +2,9 @@
 
 namespace CatCode.PlayerLoops
 {
-    public interface ILoopCanceller
+    public interface ISlimLoopContoller
     {
+        bool IsValid(ElementHandle handle);
         void Cancel(ElementHandle handle);
     }
 }

@@ -1,26 +1,18 @@
-﻿using System;
-
+﻿
 namespace CatCode.Collections
 {
     /// <summary>
     /// Lightweight handle referencing an element inside the dense array.
     /// </summary>
-    public sealed class ElementHandle : IComparable<ElementHandle>
+    public struct ElementHandle
     {
-        public int Index;
-        public uint Generation;
+        public int id;
+        public int generation;
 
-        public bool IsPendingAdd;
-        public bool IsPendingRemove;
-
-        public int CompareTo(ElementHandle other)
-            => Index.CompareTo(other.Index);
-
-        public void Reset()
+        public ElementHandle(int id, int generation)
         {
-            Index = -1;
-            IsPendingRemove = false;
-            IsPendingAdd = false;
+            this.id = id;
+            this.generation = generation;
         }
     }
 }

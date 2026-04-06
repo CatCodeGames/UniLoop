@@ -94,6 +94,14 @@ Precise control over when your code executes within the Unity frame:
 - `PlayerLoopTiming` — Select the loop: Update, FixedUpdate, or LateUpdate.
 - `PlayerLoopPhase` — Select the execution window: Early (start of the cycle) or Late (end of the cycle).
 
+### Execution Order
+The execution sequence of operation types within a single phase:
+- Slim Loop - Lightweight cycle. Unlike other types, modifying the collection (add/remove) during iteration is not safe.
+- Loop - Infinite cycle.
+- Loop (with CancellationToken) - Infinite cycle with CancellationToken support.
+- While - Conditional cycle.
+- While (with CancellationToken) - Conditional cycle with CancellationToken support.
+
 ### Execution Methods
 - **Fluent API** — Sequential selection through a call chain:
 ```cs

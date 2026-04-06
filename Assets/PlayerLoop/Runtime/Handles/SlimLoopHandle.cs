@@ -8,25 +8,15 @@ namespace CatCode.PlayerLoops
     /// </summary>
     public readonly struct SlimLoopHandle : IDisposable
     {
-        private readonly ILoopCanceller _runner;
+        private readonly ISlimLoopContoller _runner;
         private readonly ElementHandle _handle;
-        private readonly uint _handleGeneration;
 
-        public bool IsDisposed
-        {
-            get
-            {
-                if (_handle == null)
-                    return true;
-                return _handle.Generation != _handleGeneration;
-            }
-        }
+        public bool IsDisposed => _runner == null || !_runner.IsValid(_handle);
 
-        public SlimLoopHandle(ILoopCanceller runner, ElementHandle handle)
+        public SlimLoopHandle(ISlimLoopContoller runner, ElementHandle handle)
         {
             _runner = runner;
             _handle = handle;
-            _handleGeneration = handle.Generation;
         }
 
         public void Dispose()

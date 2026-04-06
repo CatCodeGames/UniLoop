@@ -35,15 +35,15 @@ namespace CatCode.PlayerLoops
         private readonly Queue<Entry> _finishedQueue;
         private readonly ObjectPool<Entry> _pool;
 
-        public DefaultLoopRunner(int startSize = 32, int growSize = 32)
+        public DefaultLoopRunner(int capacity = 32)
         {
-            _denseArray = new DeferredDenseArray<Entry>(growSize, growSize);
+            _denseArray = new DeferredDenseArray<Entry>(capacity);
             _pool = new ObjectPool<Entry>(
                 createFunc: () => new(),
                 actionOnRelease: item => item.Release(),
                 collectionCheck: false,
-                defaultCapacity: startSize);
-            _finishedQueue = new Queue<Entry>(startSize);
+                defaultCapacity: capacity);
+            _finishedQueue = new Queue<Entry>(capacity);
         }
 
         public ElementHandle Schedule(Action action)
@@ -86,13 +86,15 @@ namespace CatCode.PlayerLoops
             foreach (var entry in _finishedQueue)
             {
                 entry.onCanceled?.Invoke();
-                entry.onCanceledState.Invoke();
+                entry.onCanceledState?.Invoke();
 
                 _pool.Release(entry);
             }
             _finishedQueue.Clear();
         }
 
+        public bool IsValid(ElementHandle handle)
+            => _denseArray.IsValid(handle);
 
         public RunnerMetrics GetMetrics()
             => new(_denseArray.Count, _denseArray.PendingCount, _denseArray.TotalCount);
