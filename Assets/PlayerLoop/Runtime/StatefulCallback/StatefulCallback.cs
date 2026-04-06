@@ -20,7 +20,8 @@ namespace CatCode.PlayerLoops
         {
             s_pool = new ObjectPool<StatefulCallback<T>>(
                 createFunc: () => new(),
-                collectionCheck: false);
+                collectionCheck: false,
+                maxSize: 100000);
         }
 
         public static StatefulCallback<T> Get(Action<T> action, T state)

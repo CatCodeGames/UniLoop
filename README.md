@@ -228,87 +228,52 @@ Specialized collection at the core of UniLoop.
 ## Performance
 
 ### Infinite Cycle (Loop)
-Comparison processing 10,000 active tasks. A single MonoBehaviour with a foreach loop over a HashSet is taken as the baseline (100%).
+Benchmarking 10,000 active concurrent tasks in a single frame.
 
+| Method | Registration (ms) | Execution (ms) | Stop (ms) | GC Alloc |
+| :--- | :---: | :---: | :---: | :---: |
+| **UniLoop (Slim)** | **1.51** | **0.10** | **0.10** | **0 B** |
+| **UniLoop (Default)** | **2.35** | **0.26** | **1.72** | **0 B** |
+| Update (Baseline)* | 3.21 | 0.78 | 1.08 | 0 B |
+| Coroutines | 15.20 | 5.88 | 5.88 | 0.8 MB |
+| UniTask.Yield | 5.32 | 1.92 | 1.92 | 0.6 MB |
 
-|              | Time (ms)  | Speed (%)   |
-|--------------------|-----------:|------------:|
-| **UniLoop (Slim)** | **2.70**   | **157%**    |
-| Update (Baseline)  | 4.23       | 100%        |
-| **UniLoop (Default)**| **4.36**       | **97%**         |
-| Coroutines         | 10.44      | 40%         |
-| UniTask (Yield)    | 23.54      | 18%         |
-
-<details>
-  <summary>Test Details</summary> 
-  
-- `Update`: A MonoBehaviour storing `Action` delegates in a `HashSet` (for easy removal). Addition and removal of new Actions are also deferred.
-- `Coroutine`: A separate coroutine was started for each process with `yield return null`.
-- `UniTask`: An infinite loop using `UniTask.Yield`.
-</details>
+*\*Baseline: A single MonoBehaviour iterating over an Action collection in a standard Update loop.*
 
 ### Conditional Cycle (While)
-Each frame, 100 new processes were started (lifetime ~1 sec).
+Continuous registration and completion of tasks every frame (pipeline workload).
 
-#### Registration (Start)
+#### Scenario A: 100 new tasks / frame (lifetime 100 frames, ~10,000 active)
 
+| Method | Start (ms) | Update (ms) | Cancel (ms) | GC Alloc |
+| :--- | :---: | :---: | :---: | :---: |
+| **UniLoop (No Alloc)** | **0.10** | **0.55** | **4.31** | **0 B** |
+| UniLoop (Default) | 0.11 | 0.58 | 3.59 | 28.1 KB |
+| Update (Baseline) | 0.07 | 0.59 | 3.25 | 28.1 KB |
+| UniTask.Yield | 0.15 | 2.62 | 2.62 | 35.9 KB |
+| Coroutine | 0.34 | 6.04 | 6.04 | 36.7 KB |
+| UniTask.WaitUntil | 0.17 | 0.85 | 85.70 | 4.5 MB |
 
-|             | Time (ms) | Speed (%)    | Alloc (KB)   |
-|-------------------|--------------:|-------------:|-------------:|
-| Update (Baseline)| 0.31      | 100%     | 28.1     |
-| **UniLoop (Default)** | **0.64**          | **47%**          | **28.1**         |
-| Coroutine         | 0.67          | 45%          | 36.7         |
-| **UniLoop (NoAlloc)**| **0.88**      | **35%**      | **0**        |
-| UniTask (Yield)   | 0.94          | 32%          | 35.9         |
-| UniTaskWaitUntil  | 1.10          | 28%          | 37.5         |
+#### Scenario B: 1000 new tasks / frame (lifetime 10 frames, ~10,000 active)
 
-#### Execution (Update)
+| Method | Start (ms) | Update (ms) | Cancel (ms) | GC Alloc |
+| :--- | :---: | :---: | :---: | :---: |
+| **UniLoop (No Alloc)** | **0.73** | **0.93** | **4.50** | **0 B** |
+| UniLoop (Default) | 0.80 | 0.93 | 3.29 | 281.2 KB |
+| Update (Baseline) | 0.55 | 1.44 | 3.49 | 281.2 KB |
+| UniTask.Yield | 1.43 | 3.17 | 3.17 | 359.4 KB |
+| Coroutine | 2.23 | 6.17 | 6.17 | 367.2 KB |
+| UniTask.WaitUntil | 1.70 | 2.21 | 90.02 | 4.9 MB |
 
-
-|             | Time (ms)   | Speed (%)    | Alloc (KB)  |
-|-------------------|--------------:|-------------:|-------------:|
-| Update (Baseline)| 2.02      | 100%     | 0      |
-| **UniLoop (Default)** | **2.05**          | **99%**          | **0**          |
-| **UniLoop (NoAlloc)** | **2.05**          | **99%**          | **0**          |
-| WaitUntil         | 2.12          | 95%          | 0          |
-| Coroutine         | 3.18          | 63%          | 0          |
-| UniTask (Yield)   | 6.49          | 31%          | 0          |
-
-<details>
-  <summary>Test Details & NoAlloc Explanation</summary> 
-  Each process received a temporary object and two methods: a predicate and a completion callback to return the object to the pool.
-  
-`UniLoop` (NoAlloc) supports **Generic State Passing**, which eliminates **closures** and **boxing**. Combined with cached method references, this ensures **zero allocations** in the hot execution loop.
-</details>
-
-#### Cancellation
-
-|                   | Time (ms) | Speed (%) | Alloc (KB) |
-|-------------------|-----------------:|-------------:|----------------:|
-| Coroutine         | 6.26             |122          | 0             |
-| Update (Baseline)  | 7.64             |100          | 0             |
-| **UniLoop (Default)** | **7.69**          |**99**          | 0          | 
-| UniTask (Yield)   | 8.87             |86          | 0             |
-| **UniLoop (NoAlloc)** | **12.01**          |**63**          | 0          |
-| UniTask (WaitUntil) | 36.62 	       |20		       | 1.1Mb 	       |
-
-
-<details>
-  <summary>Test Details</summary> 
-When using `UniTask.WaitUntil`, cancelling 2,500 tasks triggers the generation of 2,500 `OperationCanceledException` instances. This causes a memory spike and high CPU load due to **Stack Trace** generation for each exception.
-</details>
+> **Note:** Pay attention to `UniTask.WaitUntil`. Mass cancellation triggers an "exception flood," resulting in critical memory spikes (**4.9 MB**) and CPU freezes (**90 ms**). UniLoop in **No Alloc** mode maintains a stable FPS and zero heap allocations.
 
 
 ### Conclusion
 
-* **Registration** — CPU overhead is comparable to starting a Coroutine or UniTask. Costs are due to handle preparation and internal pooling.
-* **Execution** — Runs at the speed of the native `Update` loop. Significantly outperforms Coroutines and UniTask under high PlayerLoop load.
-* **Completion & Cancellation** — No performance spikes. Predictable system behavior even when stopping thousands of tasks simultaneously.
+- **Registration** — CPU overhead is comparable to standard collection additions and UniTask. No Alloc mode allows for zero memory pressure during task creation.
+- **Execution** — in dynamic scenarios (continuous task pipeline), outperforms standard iteration (foreach) and async methods. Using Slim Loop reduces execution time significantly compared to the native Update.
+- **Completion & Cancellation** — minimal impact on frame performance. Unlike async solutions, the system maintains stable FPS and zero allocations even during the simultaneous termination of thousands of tasks.
 
-#### UniLoop vs UniTask (WaitUntil)
-Both tools share the same core mechanic — executing logic within the PlayerLoop. However, an async operation is required by standard to throw an exception upon cancellation. Under mass termination, this inevitably leads to an "exception flood," FPS drops, and memory spikes.
-
-`UniLoop` implements an **Exception-Free** cancellation mechanism, ensuring zero allocations during task completion and cancellation.
 
 #### Key Advantages:
 * Guaranteed execution orde within the frame.
