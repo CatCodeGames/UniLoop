@@ -291,7 +291,7 @@ Continuous registration and completion of tasks every frame (pipeline workload).
 3. Select **"Add package from git URL..."**.
 4. Enter the following URL:
 
-`https://github.com/CatCodeGames/UniLoop.git?path=Assets/PlayerLoop`
+`https://github.com/CatCodeGames/UniLoop.git?path=Assets/UniLoop`
 
 ## License
 This project is licensed under the **MIT License**
