@@ -1,5 +1,5 @@
 ﻿
-namespace CatCode.Collections
+namespace CatCode.PlayerLoops.Collections
 {
     /// <summary>
     /// Lightweight handle referencing an element inside the dense array.

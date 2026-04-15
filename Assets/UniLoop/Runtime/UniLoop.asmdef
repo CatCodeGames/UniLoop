@@ -1,9 +1,7 @@
 {
     "name": "UniLoop",
     "rootNamespace": "",
-    "references": [
-        "GUID:d9dffe74508cce740a417d96e101ccae"
-    ],
+    "references": [],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,

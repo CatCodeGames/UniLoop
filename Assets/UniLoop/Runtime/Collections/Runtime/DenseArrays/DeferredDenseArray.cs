@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace CatCode.Collections
+namespace CatCode.PlayerLoops.Collections
 {
     /// <summary>
     /// Dense array with deferred add/remove operations.

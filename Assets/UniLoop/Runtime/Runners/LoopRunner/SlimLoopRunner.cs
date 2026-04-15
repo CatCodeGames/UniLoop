@@ -1,4 +1,4 @@
-﻿using CatCode.Collections;
+﻿using CatCode.PlayerLoops.Collections;
 using System;
 
 namespace CatCode.PlayerLoops
