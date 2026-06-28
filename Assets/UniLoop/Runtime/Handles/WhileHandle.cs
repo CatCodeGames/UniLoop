@@ -27,13 +27,6 @@ namespace CatCode.PlayerLoops
             return this;
         }
 
-        public WhileHandle SetOnCompleted<T>(Action<T> action, T state)
-        {
-            if (!IsDisposed)
-                _runner.SetOnCompleted(_handle, action, state);
-            return this;
-        }
-
         public WhileHandle SetOnCanceled(Action action)
         {
             if (!IsDisposed)
@@ -41,12 +34,28 @@ namespace CatCode.PlayerLoops
             return this;
         }
 
-        public WhileHandle SetOnCanceled<T>(Action<T> action, T state)
+
+        public WhileHandle SetOnCompleted<T>(Action<T> action, T state) where T : class
+            => SetOnCompleted(state, action);
+
+        public WhileHandle SetOnCanceled<T>(Action<T> action, T state) where T : class
+            => SetOnCanceled(state, action);
+
+
+        public WhileHandle SetOnCompleted<T>(T state, Action<T> action ) where T : class
         {
             if (!IsDisposed)
-                _runner.SetOnCanceled(_handle, action, state);
+                _runner.SetOnCompleted(_handle, state, action);
             return this;
         }
+
+        public WhileHandle SetOnCanceled<T>(T state, Action<T> action) where T : class
+        {
+            if (!IsDisposed)
+                _runner.SetOnCanceled(_handle, state, action);
+            return this;
+        }
+
 
         public void Dispose()
         {

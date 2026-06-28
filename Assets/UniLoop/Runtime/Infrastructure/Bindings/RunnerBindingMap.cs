@@ -3,21 +3,21 @@
     /// <summary>
     /// Map of predefined runner bindings for inserting PlayerLoop runners at specific timings and phases.
     /// </summary>
-    internal static class RunnerBiningMap
+    internal static class RunnerBindingMap
     {
         public static readonly RunnerBinding[] Bindings = new RunnerBinding[]
         {
             new (PlayerLoopTiming.FixedUpdate,
                  PlayerLoopPhase.Early,
                  typeof(UnityEngine.PlayerLoop.FixedUpdate),
-                 typeof(UniLoopRunner.FixedUpdateBegin),
+                 typeof(UniLoopRunner.UniLoopRunnerFixedUpdateBegin),
                  null,
                  InsertPosition.Begin),
 
             new (PlayerLoopTiming.FixedUpdate,
                 PlayerLoopPhase.Late,
                 typeof(UnityEngine.PlayerLoop.FixedUpdate),
-                typeof(UniLoopRunner.FixedUpdateEnd),
+                typeof(UniLoopRunner.UniLoopRunnerFixedUpdateEnd),
                 null,
                 InsertPosition.End),
 
@@ -25,14 +25,14 @@
              new(PlayerLoopTiming.Update,
                 PlayerLoopPhase.Early,
                 typeof(UnityEngine.PlayerLoop.Update),
-                typeof(UniLoopRunner.UpdateBegin),
+                typeof(UniLoopRunner.UniLoopRunnerUpdateBegin),
                 null,
                 InsertPosition.Begin),
 
             new(PlayerLoopTiming.Update,
                 PlayerLoopPhase.Late,
                 typeof(UnityEngine.PlayerLoop.Update),
-                typeof(UniLoopRunner.UpdateEnd),
+                typeof(UniLoopRunner.UniLoopRunnerUpdateEnd),
                 null,
                 InsertPosition.End),
 
@@ -40,14 +40,14 @@
             new(PlayerLoopTiming.LateUpdate,
                 PlayerLoopPhase.Early,
                 typeof(UnityEngine.PlayerLoop.PreLateUpdate),
-                typeof(UniLoopRunner.PreLateUpdateBegin),
+                typeof(UniLoopRunner.UniLoopRunnerPreLateUpdateBegin),
                 null,
                 InsertPosition.Begin),
 
             new(PlayerLoopTiming.LateUpdate,
                 PlayerLoopPhase.Late,
                 typeof(UnityEngine.PlayerLoop.PreLateUpdate),
-                typeof(UniLoopRunner.PreLateUpdateEnd),
+                typeof(UniLoopRunner.UniLoopRunnerPreLateUpdateEnd),
                 null,
                 InsertPosition.End)
         };

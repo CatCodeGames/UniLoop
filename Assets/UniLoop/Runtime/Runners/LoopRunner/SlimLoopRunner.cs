@@ -21,11 +21,9 @@ namespace CatCode.PlayerLoops
         public void Cancel(ElementHandle handle)
             => _denseArray.Remove(handle);
 
-
         public void Run()
         {
-            _denseArray.ApplyAdd();
-            _denseArray.ApplyRemove();
+            _denseArray.ApplyChanges();
 
             var count = _denseArray.Count;
             for (int i = 0; i < count; i++)

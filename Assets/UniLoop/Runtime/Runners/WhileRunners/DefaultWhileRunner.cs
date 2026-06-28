@@ -1,6 +1,7 @@
 ﻿using CatCode.PlayerLoops.Collections;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using UnityEngine.Pool;
 
 namespace CatCode.PlayerLoops
@@ -10,65 +11,36 @@ namespace CatCode.PlayerLoops
     /// </summary>
     internal sealed class DefaultWhileRunner : IWhileController
     {
-        private class Entry
+        private struct Entry
         {
             public Func<bool> predicate;
 
-            public Action onCompleted;
-            public Action onCanceled;
-
-            public IStatefulCallback onCompletedState;
-            public IStatefulCallback onCanceledState;
+            public CallbackData onCompleted;
+            public CallbackData onCanceled;
 
             public bool isCancellationRequested;
 
-            public void Release()
+            public Entry(Func<bool> predicate)
             {
-                predicate = null;
+                this.predicate = predicate;
 
-                onCompleted = null;
-                onCanceled = null;
-
-                onCompletedState?.Release();
-                onCompletedState = null;
-                onCanceledState?.Release();
-                onCanceledState = null;
+                onCompleted = CallbackData.Empty;
+                onCanceled = CallbackData.Empty;
 
                 isCancellationRequested = false;
             }
         }
 
-        private struct FinishedEntry
-        {
-            public Entry entry;
-            public bool isCanceled;
-
-            public FinishedEntry(Entry entry, bool isCanceled)
-            {
-                this.entry = entry;
-                this.isCanceled = isCanceled;
-            }
-        }
-
-        private readonly ObjectPool<Entry> _pool;
         private readonly DeferredDenseArray<Entry> _denseArray;
-        private readonly Queue<FinishedEntry> _finishedQueue;
 
-        public DefaultWhileRunner(int startSize = 32)
+        public DefaultWhileRunner(int capacity = 32)
         {
-            _denseArray = new DeferredDenseArray<Entry>(startSize);
-            _pool = new ObjectPool<Entry>(
-                createFunc: () => new(),
-                actionOnRelease: item => item.Release(),
-                collectionCheck: false,
-                defaultCapacity: startSize);
-            _finishedQueue = new Queue<FinishedEntry>(startSize);
+            _denseArray = new DeferredDenseArray<Entry>(capacity);
         }
 
         public ElementHandle Schedule(Func<bool> predicate)
         {
-            var entry = _pool.Get();
-            entry.predicate = predicate;
+            var entry = new Entry(predicate);
             return _denseArray.Add(entry);
         }
 
@@ -77,17 +49,19 @@ namespace CatCode.PlayerLoops
 
 
         public void SetOnCompleted(ElementHandle handle, Action onCompleted)
-            => _denseArray[handle].onCompleted = onCompleted;
-        public void SetOnCompleted<T>(ElementHandle handle, Action<T> onCompleted, T state)
-            => _denseArray[handle].onCompletedState = StatefulCallback<T>.Get(onCompleted, state);
+            => _denseArray[handle].onCompleted = CallbackData.Create(onCompleted);
+        public void SetOnCompleted<T>(ElementHandle handle, T state, Action<T> onCompleted) where T : class
+            => _denseArray[handle].onCompleted = CallbackData.Create(state, onCompleted);
+
         public void SetOnCanceled(ElementHandle handle, Action onCanceled)
-            => _denseArray[handle].onCanceled = onCanceled;
-        public void SetOnCanceled<T>(ElementHandle handle, Action<T> onCanceled, T state)
-            => _denseArray[handle].onCanceledState = StatefulCallback<T>.Get(onCanceled, state);
+            => _denseArray[handle].onCanceled = CallbackData.Create(onCanceled);
+        public void SetOnCanceled<T>(ElementHandle handle, T state, Action<T> onCanceled) where T : class
+            => _denseArray[handle].onCanceled = CallbackData.Create(state, onCanceled);
 
 
         public void Run()
         {
+            var queueHandle = UnsafeGenericPool<Queue<CallbackData>>.Get(out var finishedQueue);
             _denseArray.ApplyAdd();
 
             var count = _denseArray.Count;
@@ -96,35 +70,23 @@ namespace CatCode.PlayerLoops
                 var element = _denseArray[i];
                 if (element.isCancellationRequested)
                 {
-                    _finishedQueue.Enqueue(new(element, true));
+                    finishedQueue.Enqueue(element.onCanceled);
                     _denseArray.RemoveAt(i);
                     continue;
                 }
                 if (!element.predicate())
                 {
-                    _finishedQueue.Enqueue(new(element, false));
+                    finishedQueue.Enqueue(element.onCompleted);
                     _denseArray.RemoveAt(i);
                 }
             }
 
             _denseArray.ApplyRemove();
 
-            foreach (var entry in _finishedQueue)
-            {
-                var element = entry.entry;
-                if (entry.isCanceled)
-                {
-                    element.onCanceled?.Invoke();
-                    element.onCanceledState?.Invoke();
-                }
-                else
-                {
-                    element.onCompleted?.Invoke();
-                    element.onCompletedState?.Invoke();
-                }
-                _pool.Release(element);
-            }
-            _finishedQueue.Clear();
+            foreach (var data in finishedQueue)            
+                data.Invoke();
+            
+            finishedQueue.Clear();
         }
 
         public bool IsValid(ElementHandle handle)

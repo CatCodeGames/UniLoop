@@ -31,7 +31,7 @@ namespace CatCode.PlayerLoops
         private static void Initialize()
         {
             _registry = new PlayerLoopRunnerRegistry(TimingCount, PhasesPerTiming, PlayerLoopRunnerFactory.Create);
-            _inserter = new PlayerLoopRunnerInserter(_registry, RunnerBiningMap.Bindings);
+            _inserter = new PlayerLoopRunnerInserter(_registry, RunnerBindingMap.Bindings);
 
             _inserter.InserRunners();
             EditorPlayModeActionRegistry.Register(() => _inserter.Dispose(), PlayModeEvent.ExitingPlayMode);

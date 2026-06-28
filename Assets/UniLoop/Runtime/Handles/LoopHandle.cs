@@ -27,12 +27,16 @@ namespace CatCode.PlayerLoops
             return this;
         }
 
-        public LoopHandle SetOnCanceled<T>(Action<T> action, T state)
+        public LoopHandle SetOnCanceled<T>(Action<T> action, T state) where T : class
+            => SetOnCanceled(state, action);
+
+        public LoopHandle SetOnCanceled<T>(T state, Action<T> action) where T : class
         {
             if (!IsDisposed)
-                _runner.SetOnCanceled(_handle, action, state);
+                _runner.SetOnCanceled(_handle, state, action);
             return this;
         }
+
 
         public void Dispose()
         {

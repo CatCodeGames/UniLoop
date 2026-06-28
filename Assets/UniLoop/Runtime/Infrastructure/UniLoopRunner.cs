@@ -2,21 +2,22 @@
 {
     internal static class UniLoopRunner
     {
-        public struct InitializationBegin { }
-        public struct EarlyUpdateBegin { }
-        public struct FixedUpdateBegin { }
-        public struct PreUpdateBegin { }
-        public struct UpdateBegin { }
-        public struct PreLateUpdateBegin { }
-        public struct PostLateUpdateBegin { }
+        
+        public struct UniLoopRunnerInitializationBegin { }
+        public struct UniLoopRunnerEarlyUpdateBegin { }
+        public struct UniLoopRunnerFixedUpdateBegin { }
+        public struct UniLoopRunnerPreUpdateBegin { }
+        public struct UniLoopRunnerUpdateBegin { }
+        public struct UniLoopRunnerPreLateUpdateBegin { }
+        public struct UniLoopRunnerPostLateUpdateBegin { }
 
-        public struct InitializationEnd { }
-        public struct EarlyUpdateEnd { }
-        public struct FixedUpdateEnd { }
-        public struct PreUpdateEnd { }
-        public struct UpdateEnd { }
-        public struct PreLateUpdateEnd { }
-        public struct PostLateUpdateEnd { }
+        public struct UniLoopRunnerInitializationEnd { }
+        public struct UniLoopRunnerEarlyUpdateEnd { }
+        public struct UniLoopRunnerFixedUpdateEnd { }
+        public struct UniLoopRunnerPreUpdateEnd { }
+        public struct UniLoopRunnerUpdateEnd { }
+        public struct UniLoopRunnerPreLateUpdateEnd { }
+        public struct UniLoopRunnerPostLateUpdateEnd { }
 
 #if UNITY_2020_2_OR_NEWER
         public struct TimeUpdateBegin { }
