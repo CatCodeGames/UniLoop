@@ -12,6 +12,7 @@ namespace CatCode.PlayerLoops
         private readonly SlimLoopRunner _slimLoopRunner;
         private readonly DefaultLoopRunner _defaultLoopRunner;
         private readonly TokenLoopRunner _tokenLoopRunner;
+        private readonly CountedLoopRunner _countedLoopRunner;
         private readonly DefaultWhileRunner _defaultWhileRunner;
         private readonly TokenWhileRunner _tokenWhileRunner;
 
@@ -22,30 +23,56 @@ namespace CatCode.PlayerLoops
             SlimLoopRunner slimLoopRunner,
             DefaultLoopRunner defaultLoopRunner,
             TokenLoopRunner tokenLoopRunner,
+            CountedLoopRunner countedLoopRunner,
             DefaultWhileRunner defaultWhileRunner,
             TokenWhileRunner tokenWhileRunner)
         {
             _slimLoopRunner = slimLoopRunner;
             _defaultLoopRunner = defaultLoopRunner;
             _tokenLoopRunner = tokenLoopRunner;
+            _countedLoopRunner = countedLoopRunner;
             _defaultWhileRunner = defaultWhileRunner;
             _tokenWhileRunner = tokenWhileRunner;
         }
 
         public SlimLoopHandle ScheduleSlim(Action action)
-            => new(_slimLoopRunner, _slimLoopRunner.Add(action));
+        {
+            UniLoop.ValidateAccess();
+            return new(_slimLoopRunner, _slimLoopRunner.Add(action));
+        }
 
         public LoopHandle Schedule(Action action)
-            => new(_defaultLoopRunner, _defaultLoopRunner.Schedule(action));
+        {
+            UniLoop.ValidateAccess();
+            return new(_defaultLoopRunner, _defaultLoopRunner.Schedule(action));
+        }
 
         public TokenLoopHandle Schedule(Action action, CancellationToken cancellationToken)
-            => new(_tokenLoopRunner, _tokenLoopRunner.Schedule(action, cancellationToken));
+        {
+            UniLoop.ValidateAccess();
+            return new(_tokenLoopRunner, _tokenLoopRunner.Schedule(action, cancellationToken));
+        }
+
+        public WhileHandle Schedule(Action action, int count)
+        {
+            UniLoop.ValidateAccess();
+            return new(_countedLoopRunner, _countedLoopRunner.Schedule(action, count));
+        }
+
+        public WhileHandle ScheduleOnce(Action action)
+            => Schedule(action, 1);
 
         public WhileHandle Schedule(Func<bool> predicate)
-            => new(_defaultWhileRunner, _defaultWhileRunner.Schedule(predicate));
+        {
+            UniLoop.ValidateAccess();
+            return new(_defaultWhileRunner, _defaultWhileRunner.Schedule(predicate));
+        }
 
         public TokenWhileHandle Schedule(Func<bool> predicate, CancellationToken cancellationToken)
-            => new(_tokenWhileRunner, _tokenWhileRunner.Schedule(predicate, cancellationToken));
+        {
+            UniLoop.ValidateAccess();
+            return new(_tokenWhileRunner, _tokenWhileRunner.Schedule(predicate, cancellationToken));
+        }
 
 
         public void Run()
@@ -53,21 +80,21 @@ namespace CatCode.PlayerLoops
             _slimLoopRunner.Run();
             _defaultLoopRunner.Run();
             _tokenLoopRunner.Run();
+            _countedLoopRunner.Run();
             _defaultWhileRunner.Run();
             _tokenWhileRunner.Run();
         }
 
-        public RunnerSnapshot[] GetSnapshots()
-        {
-            var snapshots = new RunnerSnapshot[]
-                {
-                    new (UniLoopRunnerType.SlimLoop, _slimLoopRunner.GetMetrics()),
-                    new (UniLoopRunnerType.Loop, _defaultLoopRunner.GetMetrics()),
-                    new (UniLoopRunnerType.TokenLoop, _tokenLoopRunner.GetMetrics()),
-                    new (UniLoopRunnerType.While, _defaultWhileRunner.GetMetrics()),
-                    new (UniLoopRunnerType.TokenWhile, _tokenWhileRunner.GetMetrics()),
-                };
-            return snapshots;
-        }
+        public RunnerMetrics GetMetrics(UniLoopRunnerType type)
+            => type switch
+            {
+                UniLoopRunnerType.SlimLoop => _slimLoopRunner.GetMetrics(),
+                UniLoopRunnerType.Loop => _defaultLoopRunner.GetMetrics(),
+                UniLoopRunnerType.TokenLoop => _tokenLoopRunner.GetMetrics(),
+                UniLoopRunnerType.CountedLoop => _countedLoopRunner.GetMetrics(),
+                UniLoopRunnerType.While => _defaultWhileRunner.GetMetrics(),
+                UniLoopRunnerType.TokenWhile => _tokenWhileRunner.GetMetrics(),
+                _ => throw new ArgumentOutOfRangeException(nameof(type)),
+            };
     }
 }

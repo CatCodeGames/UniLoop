@@ -7,7 +7,8 @@
 * No Performance Spikes — Predictable load without spikes at any stage of the task lifecycle.
 * Max Performance — Low-level injection directly into the PlayerLoop systems.
 * Safe Modification — Add or remove tasks safely during the loop iteration.
-* Deterministic Order — Tasks are executed strictly in the order they were registered.
+* Deterministic Order — Tasks of the same type are executed strictly in the order they were registered.
+* Error Isolation — An exception in one task is logged and does not stop the others.
 * CancellationToken Support — Built-in integration for modern lifecycle management.
 * IDisposable Handles — Precise manual control over running processes.
 * Editor Safety — Automatic cleanup of injected systems when exiting Play Mode.
@@ -44,7 +45,7 @@ P.S. Inside the library, you'll find some interesting solutions, such as special
 
 ```csharp
 // --- 1. Infinite Cycle (Loop) ---
-// Fluent API: [Timing] -> [Phase] -> [Type] -> [Schedule]
+// Fluent API: [Timing + Phase] -> [Type] -> [Schedule]
 LoopHandle handle = UniLoop.Update.Loop.Schedule(() => Debug.Log("Tick"));
 handle.Dispose(); // Stop the process via handle
 
@@ -60,7 +61,19 @@ UniLoop.Update.Loop.Schedule(() => Debug.Log("Tick"), _cts.Token);
 _cts.Cancel();
 
 
-// --- 2. Conditional Cycle (While) ---
+// --- 2. Counted Cycle (Counted Loop) ---
+// Runs the given number of times, then calls OnCompleted
+UniLoop.Update.Loop.Schedule(() => Debug.Log("Tick"), 3)
+    .SetOnCompleted(() => Debug.Log("Done"));
+
+// Single call on the next execution of the phase
+UniLoop.Update.Loop.ScheduleOnce(() => Debug.Log("Once"));
+
+// Delay by N frames: an empty action plus a completion callback
+UniLoop.Update.Loop.Schedule(EmptyAction, 10).SetOnCompleted(DoWork);
+
+
+// --- 3. Conditional Cycle (While) ---
 // Runs as long as the predicate returns true
 WhileHandle handle = UniLoop.Update.While.Schedule(() => 
     {
@@ -87,6 +100,7 @@ using (var handle = UniLoop.Update.Loop.Schedule(() => Debug.Log("Tick")))
 
 ### Process Types
 - `Loop` (Infinite cycle) — Executes every frame until manually stopped or cancelled via a token.
+- `Counted Loop` (Counted cycle) — Executes the given number of times, then completes. `ScheduleOnce` is the case of a single run. A run counts even if the action throws.
 - `While` (Conditional cycle) — Executes as long as the predicate returns `true`. Supports both cancellation and completion events.
 
 ### Execution Points (Timings & Phases)
@@ -94,11 +108,23 @@ Precise control over when your code executes within the Unity frame:
 - `PlayerLoopTiming` — Select the loop: Update, FixedUpdate, or LateUpdate.
 - `PlayerLoopPhase` — Select the execution window: Early (start of the cycle) or Late (end of the cycle).
 
+Fluent API properties and their insertion points:
+
+| Property | Timing | Phase | PlayerLoop insertion point |
+| :--- | :--- | :--- | :--- |
+| `UniLoop.FixedUpdate` | FixedUpdate | Early | start of `FixedUpdate` |
+| `UniLoop.PostFixedUpdate` | FixedUpdate | Late | end of `FixedUpdate` |
+| `UniLoop.Update` | Update | Early | start of `Update` |
+| `UniLoop.PostUpdate` | Update | Late | end of `Update` |
+| `UniLoop.LateUpdate` | LateUpdate | Early | start of `PreLateUpdate` |
+| `UniLoop.PostLateUpdate` | LateUpdate | Late | end of `PreLateUpdate` |
+
 ### Execution Order
-The execution sequence of operation types within a single phase:
-- Slim Loop - Lightweight cycle. Unlike other types, modifying the collection (add/remove) during iteration is not safe.
+The execution sequence of operation types within a single phase. Tasks of different types run in groups in this order, not in the order `Schedule` was called:
+- Slim Loop - Lightweight cycle. Cancellation during iteration takes effect from the next frame, so the task may run once more in the current frame.
 - Loop - Infinite cycle.
 - Loop (with CancellationToken) - Infinite cycle with CancellationToken support.
+- Counted Loop - Counted cycle.
 - While - Conditional cycle.
 - While (with CancellationToken) - Conditional cycle with CancellationToken support.
 
@@ -115,12 +141,21 @@ Each registration returns a **struct handle** — a lightweight descriptor to co
 - **For Infinite Cycles (Loop)**
   - `LoopHandle` — handle with a `.Dispose()` method for manual stop.
   - `TokenLoopHandle` — for processes with a `CancellationToken`.
-Both variants support registering a cancellation callback via `.SetOnCanceled()`.*
+Both variants support registering a cancellation callback via `.SetOnCanceled()`.
 
-- **For Conditional Cycles (While)**
+- **For Conditional Cycles (While) and Counted Cycles (Counted Loop)**
   - `WhileHandle` — handle with a `.Dispose()` method for manual stop.
   - `TokenWhileHandle` — for processes with a `CancellationToken`.
 Support for subscribing to the completion of a process via `.SetOnCompleted()`.
+
+`IsDisposed` becomes `true` right after `Dispose()`. The task itself is removed from the loop on the next frame, and the cancellation callback is invoked at that point.
+
+`TokenLoopHandle` and `TokenWhileHandle` have no `Dispose()`: the token stops the task. `IsActive` tells whether the task is still running and becomes `false` right after the token is canceled.
+
+### Limitations
+- Requires Unity 2021.3 or newer.
+- The API must be called from the main thread and only in Play Mode. In the Editor and development builds a violation throws `InvalidOperationException`.
+- On exiting Play Mode all scheduled tasks are dropped without calling `onCanceled`.
 
 
 ## Showcase
@@ -177,26 +212,19 @@ public class TimeScaleController
 ### Slim Loop
 Lightweight version of the loop. Ideal for global systems running throughout the app's lifetime.
 - Fastest way to iterate in the PlayerLoop.
-- Limitation: If `Dispose()` is called during execution, the task will be removed in the next frame.
+- Limitation: If `Dispose()` is called while the loop is running, the task may run once more in the current frame. From the next frame on it no longer runs.
 - Registration via `UniLoop.Update.Loop.ScheduleSlim(action)` or `UniLoop.ScheduleSlim(...)`.
 
 
 ### Zero-Alloc & Delegate Caching
-Using cached delegates and State (structs) eliminates closures and boxing during registration to achieve 0B GC Alloc.
+Using cached delegates and State eliminates closures during registration to achieve 0B GC Alloc. State must be a reference type (`where T : class`), so there is no boxing either.
 
 ```csharp
 public sealed class MyClass
 {
-    private readonly struct PoolContext // Context as a readonly struct
-    {
-        public readonly IObjectPool<GameObject> Pool;
-        public readonly GameObject Entity;
-        public PoolContext(IObjectPool<GameObject> pool, GameObject entity) => (Pool, Entity) = (pool, entity);
-    }
-
     // Cache method references once during initialization
     private readonly Func<bool> _cachedPredicate;
-    private readonly Action<PoolContext> _cachedOnCompleted;
+    private readonly Action<GameObject> _cachedOnCompleted;
     private IObjectPool<GameObject> _pool;
 
     public MyClass()
@@ -208,12 +236,12 @@ public sealed class MyClass
     public void Run()
     {
         var obj = _pool.Get();
-        // Passing PoolContext through State — no allocations
+        // Passing the object through State — no allocations
         UniLoop.Update.While.Schedule(_cachedPredicate)
-            .SetOnCompleted(_cachedOnCompleted, new PoolContext(_pool, obj));
+            .SetOnCompleted(_cachedOnCompleted, obj);
     }
 
-    private void OnCompleted(PoolContext ctx) => ctx.Pool.Release(ctx.Entity);
+    private void OnCompleted(GameObject entity) => _pool.Release(entity);
     private bool Predicate() => /* logic */ true;
 }
 ```
@@ -226,60 +254,65 @@ Specialized collection at the core of UniLoop.
 
 ---
 ## Performance
+Every method runs the same work in `Update`. Values are medians. **Empty frame** is a frame without tasks; compare frame times against it. **GC** is managed memory allocated on top of the empty frame.
 
-### Infinite Cycle (Loop)
-Benchmarking 10,000 active concurrent tasks in a single frame.
+Setup: Unity 6000.3, Editor, Mono (Code Optimization: Debug), Ryzen 5 5600. In Release and in a player build the absolute numbers are lower. The benchmarks live in `UniLoop Tests/Benchmarks` and can be run from the Test Runner.
 
-| Method | Registration (ms) | Execution (ms) | Stop (ms) | GC Alloc |
-| :--- | :---: | :---: | :---: | :---: |
-| **UniLoop (Slim)** | **1.51** | **0.10** | **0.10** | **0 B** |
-| **UniLoop (Default)** | **2.35** | **0.26** | **1.72** | **0 B** |
-| Update (Baseline)* | 3.21 | 0.78 | 1.08 | 0 B |
-| Coroutines | 15.20 | 5.88 | 5.88 | 0.8 MB |
-| UniTask.Yield | 5.32 | 1.92 | 1.92 | 0.6 MB |
+### 10,000 tasks: start, run and stop at once
 
-*\*Baseline: A single MonoBehaviour iterating over an Action collection in a standard Update loop.*
+| Method | Start, ms | GC on start | Frame, ms | GC per frame | Stop*, ms |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| *Empty frame* | — | — | *4.01* | — | — |
+| **UniLoop Slim** | 1.40 | **0** | 4.29 | **0** | 0.5 |
+| **UniLoop Loop** | 2.78 | **0** | 4.23 | **0** | 0.4 |
+| **UniLoop Loop + CancellationToken** | 2.85 | **0** | 4.28 | **0** | 0.5 |
+| **UniLoop While** | 3.51 | **0** | 4.08 | **0** | 0.5 |
+| Custom manager (`List<Action>` in `Update`) | 0.21 | 0 | 4.23 | 0 | 0.1 |
+| Coroutine | 13.96 | 547 KB | 8.30 | 0 | 394 |
+| UniTask.Yield | 8.13 | 1.8 MB | 14.49 | 234 KB | 4.9 |
 
-### Conditional Cycle (While)
-Continuous registration and completion of tasks every frame (pipeline workload).
+*\*Stop is the call itself plus the deferred work in the next frame: removal from lists and cancellation handling.*
 
-#### Scenario A: 100 new tasks / frame (lifetime 100 frames, ~10,000 active)
+### Pipeline: 1,000 new tasks every frame, 10-frame lifetime (~10,000 active)
 
-| Method | Start (ms) | Update (ms) | Cancel (ms) | GC Alloc |
-| :--- | :---: | :---: | :---: | :---: |
-| **UniLoop (No Alloc)** | **0.10** | **0.55** | **4.31** | **0 B** |
-| UniLoop (Default) | 0.11 | 0.58 | 3.59 | 28.1 KB |
-| Update (Baseline) | 0.07 | 0.59 | 3.25 | 28.1 KB |
-| UniTask.Yield | 0.15 | 2.62 | 2.62 | 35.9 KB |
-| Coroutine | 0.34 | 6.04 | 6.04 | 36.7 KB |
-| UniTask.WaitUntil | 0.17 | 0.85 | 85.70 | 4.5 MB |
+**Tasks are stopped manually, one by one**
 
-#### Scenario B: 1000 new tasks / frame (lifetime 10 frames, ~10,000 active)
+| Method | Start and cancel per frame, ms | Frame, ms | GC per frame |
+| :--- | ---: | ---: | ---: |
+| *Empty frame* | — | *4.07* | — |
+| **UniLoop Loop** | 0.37 | 4.25 | **0** |
+| Custom manager | 0.06 | 4.07 | 0 |
+| Coroutine | 79.03 | 10.27 | 56 KB |
+| UniTask.Yield (token per task) | 1.18 | 14.57 | 688 KB |
 
-| Method | Start (ms) | Update (ms) | Cancel (ms) | GC Alloc |
-| :--- | :---: | :---: | :---: | :---: |
-| **UniLoop (No Alloc)** | **0.73** | **0.93** | **4.50** | **0 B** |
-| UniLoop (Default) | 0.80 | 0.93 | 3.29 | 281.2 KB |
-| Update (Baseline) | 0.55 | 1.44 | 3.49 | 281.2 KB |
-| UniTask.Yield | 1.43 | 3.17 | 3.17 | 359.4 KB |
-| Coroutine | 2.23 | 6.17 | 6.17 | 367.2 KB |
-| UniTask.WaitUntil | 1.70 | 2.21 | 90.02 | 4.9 MB |
+**Tasks end by themselves**
 
-> **Note:** Pay attention to `UniTask.WaitUntil`. Mass cancellation triggers an "exception flood," resulting in critical memory spikes (**4.9 MB**) and CPU freezes (**90 ms**). UniLoop in **No Alloc** mode maintains a stable FPS and zero heap allocations.
-
+| Method | Start per frame, ms | Frame, ms | GC per frame |
+| :--- | ---: | ---: | ---: |
+| *Empty frame* | — | *3.93* | — |
+| **UniLoop Counted** | 0.42 | 4.35 | **0** |
+| **UniLoop While** (counter in a closure) | 0.44 | 4.63 | 145 KB |
+| Custom manager | 0.04 | 4.18 | 0 |
+| Coroutine | 1.37 | 9.14 | 63 KB |
+| UniTask.Yield | 0.39 | 6.07 | 47 KB |
 
 ### Conclusion
+- **No allocations** at any stage: start, run, cancellation, completion. Coroutines and UniTask allocate from tens of kilobytes to megabytes.
+- **Running** 10,000 tasks is almost indistinguishable from an empty frame. Coroutines add about 4 ms, UniTask about 10 ms.
+- **Stable cost.** UniLoop costs the same whether tasks are canceled manually or end by themselves: about 0.4 ms per 1,000 operations per frame. Stopping coroutines one by one costs 79 ms per frame; UniTask with a token per task adds 10 ms to the frame and 688 KB.
+- **While with a closure** allocates per task: that is the closure in user code. For "run N times" use the counted loop, which allocates nothing.
 
-- **Registration** — CPU overhead is comparable to standard collection additions and UniTask. No Alloc mode allows for zero memory pressure during task creation.
-- **Execution** — in dynamic scenarios (continuous task pipeline), outperforms standard iteration (foreach) and async methods. Using Slim Loop reduces execution time significantly compared to the native Update.
-- **Completion & Cancellation** — minimal impact on frame performance. Unlike async solutions, the system maintains stable FPS and zero allocations even during the simultaneous termination of thousands of tasks.
+### Why not just `List<Action>`?
+A custom `List<Action>` manager is faster at starting and stopping, but all it does is iterate a list. UniLoop adds on top of that:
 
+- **Safe changes during the loop** — start or stop a task right from another task.
+- **Protected handles** — generation-checked: a repeated `Dispose` or a stale handle breaks nothing.
+- **Error isolation** — an exception in one task does not stop the others.
+- **Callbacks and cancellation** — `SetOnCompleted`, `SetOnCanceled`, `CancellationToken`, "while a condition holds" and "N times" tasks.
+- **Any point of the frame** — start and end of `Update`, `FixedUpdate` and `LateUpdate` without extra MonoBehaviours.
+- **State without closures** — data is passed to callbacks with no allocation.
 
-#### Key Advantages:
-* Guaranteed execution orde within the frame.
-* Zero-Alloc Suppor — ability to run without allocations throughout the entire task lifecycle.
-* Flexible contro via `IDisposable` handles or `CancellationToken`.
-* No performance spike at any stage of the task lifecycle.
+The price is tenths of a millisecond per thousand operations per frame; in a typical game that is microseconds.
 
 
 

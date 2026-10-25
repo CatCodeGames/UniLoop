@@ -1,5 +1,4 @@
-﻿using JetBrains.Annotations;
-using NUnit.Framework;
+﻿using NUnit.Framework;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -22,7 +21,7 @@ namespace CatCode.PlayerLoops.Tests
         };
 
         public static readonly PlayerLoopTiming[] Timings =
-{
+        {
             PlayerLoopTiming.Update,
             PlayerLoopTiming.LateUpdate,
             PlayerLoopTiming.FixedUpdate
@@ -34,6 +33,23 @@ namespace CatCode.PlayerLoops.Tests
             PlayerLoopPhase.Late
         };
 
+        private readonly List<LoopTestRunner> _runners = new();
+
+        [TearDown]
+        public void TearDown()
+        {
+            foreach (var runner in _runners)
+                runner.Cancel();
+            _runners.Clear();
+        }
+
+        private LoopTestRunner CreateRunner(LoopRunnerStrategy strategy)
+        {
+            var runner = new LoopTestRunner(CreateStrategy(strategy));
+            _runners.Add(runner);
+            return runner;
+        }
+
         private ILoopStrategy CreateStrategy(LoopRunnerStrategy strategy)
             => strategy switch
             {
@@ -43,32 +59,14 @@ namespace CatCode.PlayerLoops.Tests
             };
 
         [UnityTest]
-        public IEnumerator Check_Cancel(
-           [ValueSource(nameof(Strategies))] LoopRunnerStrategy strategy,
-           [ValueSource(nameof(Timings))] PlayerLoopTiming timing,
-           [ValueSource(nameof(Phases))] PlayerLoopPhase phase)
-        {
-            yield return TestUtility.WaitFrames(1, timing);
-
-            var runner = new LoopTestRunner(CreateStrategy(strategy));
-            runner.Start(timing, phase);
-
-            Assert.IsFalse(runner.Canceled);
-            yield return TestUtility.WaitFrames(TestSettings.FramesCount, timing);
-            runner.Cancel();
-            yield return TestUtility.WaitFrames(1, timing);
-            Assert.IsTrue(runner.Canceled);
-        }
-       
-        [UnityTest]
-        public IEnumerator Check_Cancel_EveryFrame(
+        public IEnumerator Cancel_AfterFrames(
             [ValueSource(nameof(Strategies))] LoopRunnerStrategy strategy,
             [ValueSource(nameof(Timings))] PlayerLoopTiming timing,
             [ValueSource(nameof(Phases))] PlayerLoopPhase phase)
         {
             yield return TestUtility.WaitFrames(1, timing);
 
-            var runner = new LoopTestRunner(CreateStrategy(strategy));
+            var runner = CreateRunner(strategy);
             runner.Start(timing, phase);
 
             for (int i = 0; i < TestSettings.FramesCount; i++)
@@ -82,47 +80,47 @@ namespace CatCode.PlayerLoops.Tests
         }
 
         [UnityTest]
-        public IEnumerator Check_Process_WithCancel_EveryFrame(
+        public IEnumerator Cancel_SameFrame(
             [ValueSource(nameof(Strategies))] LoopRunnerStrategy strategy,
             [ValueSource(nameof(Timings))] PlayerLoopTiming timing,
             [ValueSource(nameof(Phases))] PlayerLoopPhase phase)
         {
             yield return TestUtility.WaitFrames(1, timing);
 
-            var runner = new LoopTestRunner(CreateStrategy(strategy));
-            runner.Start(timing, phase);
-
-            for (int i = 0; i < TestSettings.HalfFramesCount; i++)
-            {
-                Assert.AreEqual(runner.CurrentValue, i);
-                yield return TestUtility.WaitFrames(1, timing);
-            }
-            runner.Cancel();
-            yield return TestUtility.WaitFrames(1, timing);
-            Assert.AreEqual(runner.CurrentValue, TestSettings.HalfFramesCount);
-        }
-
-        [UnityTest]
-        public IEnumerator Check_Process_Instant_Cancel(
-            [ValueSource(nameof(Strategies))] LoopRunnerStrategy strategy,
-            [ValueSource(nameof(Timings))] PlayerLoopTiming timing,
-            [ValueSource(nameof(Phases))] PlayerLoopPhase phase)
-        {
-            yield return TestUtility.WaitFrames(1, timing);
-
-            var runner = new LoopTestRunner(CreateStrategy(strategy));
+            var runner = CreateRunner(strategy);
             runner.Start(timing, phase);
 
             runner.Cancel();
 
             yield return TestUtility.WaitFrames(1, timing);
 
-            Assert.AreEqual(runner.CurrentValue,0);
+            Assert.AreEqual(0, runner.CurrentValue);
             Assert.IsTrue(runner.Canceled);
         }
 
         [UnityTest]
-        public IEnumerator Check_Group_RandomCancel_Repeat(
+        public IEnumerator Process_StopsAfterCancel(
+            [ValueSource(nameof(Strategies))] LoopRunnerStrategy strategy,
+            [ValueSource(nameof(Timings))] PlayerLoopTiming timing,
+            [ValueSource(nameof(Phases))] PlayerLoopPhase phase)
+        {
+            yield return TestUtility.WaitFrames(1, timing);
+
+            var runner = CreateRunner(strategy);
+            runner.Start(timing, phase);
+
+            for (int i = 0; i < TestSettings.HalfFramesCount; i++)
+            {
+                Assert.AreEqual(i, runner.CurrentValue);
+                yield return TestUtility.WaitFrames(1, timing);
+            }
+            runner.Cancel();
+            yield return TestUtility.WaitFrames(1, timing);
+            Assert.AreEqual(TestSettings.HalfFramesCount, runner.CurrentValue);
+        }
+
+        [UnityTest]
+        public IEnumerator Cancel_RandomInGroup(
             [ValueSource(nameof(Strategies))] LoopRunnerStrategy strategy,
             [ValueSource(nameof(Timings))] PlayerLoopTiming timing,
             [ValueSource(nameof(Phases))] PlayerLoopPhase phase)
@@ -142,7 +140,7 @@ namespace CatCode.PlayerLoops.Tests
             {
                 for (int i = 0; i < createPerFrame; i++)
                 {
-                    var runner = new LoopTestRunner(CreateStrategy(strategy));
+                    var runner = CreateRunner(strategy);
                     runner.Start(timing, phase);
                     active.Add(new LoopRunnerInfo(runner, frame));
                 }

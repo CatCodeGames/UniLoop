@@ -11,7 +11,7 @@ namespace CatCode.PlayerLoops
         private readonly IWhileRegistry _runner;
         private readonly ElementHandle _handle;
 
-        public bool IsDisposed => _runner == null || !_runner.IsValid(_handle);
+        public bool IsActive => _runner != null && _runner.IsActive(_handle);
 
         public TokenWhileHandle(IWhileRegistry runner, ElementHandle handle) : this()
         {
@@ -22,15 +22,13 @@ namespace CatCode.PlayerLoops
 
         public TokenWhileHandle SetOnCompleted(Action action)
         {
-            if (!IsDisposed)
-                _runner.SetOnCompleted(_handle, action);
+            _runner?.SetOnCompleted(_handle, action);
             return this;
         }
 
         public TokenWhileHandle SetOnCanceled(Action action)
         {
-            if (!IsDisposed)
-                _runner.SetOnCanceled(_handle, action);
+            _runner?.SetOnCanceled(_handle, action);
             return this;
         }
 
@@ -44,15 +42,13 @@ namespace CatCode.PlayerLoops
 
         public TokenWhileHandle SetOnCompleted<T>(T state, Action<T> action) where T : class
         {
-            if (!IsDisposed)
-                _runner.SetOnCompleted(_handle, state, action);
+            _runner?.SetOnCompleted(_handle, state, action);
             return this;
         }
 
         public TokenWhileHandle SetOnCanceled<T>(T state, Action<T> action) where T : class
         {
-            if (!IsDisposed)
-                _runner.SetOnCanceled(_handle, state, action);
+            _runner?.SetOnCanceled(_handle, state, action);
             return this;
         }
     }

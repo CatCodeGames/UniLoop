@@ -13,6 +13,7 @@
                 new SlimLoopRunner(Capacity),
                 new DefaultLoopRunner(Capacity),
                 new TokenLoopRunner(Capacity),
+                new CountedLoopRunner(Capacity),
                 new DefaultWhileRunner(Capacity),
                 new TokenWhileRunner(Capacity));
         }

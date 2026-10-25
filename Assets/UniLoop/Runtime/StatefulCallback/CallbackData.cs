@@ -8,6 +8,8 @@ namespace CatCode.PlayerLoops
         public readonly Delegate Callback;
         public readonly Action<CallbackData> Invoker;
 
+        public bool IsEmpty => Callback == null;
+
         public void Invoke()
             => Invoker(this);
 

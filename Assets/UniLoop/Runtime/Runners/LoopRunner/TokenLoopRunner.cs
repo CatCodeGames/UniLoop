@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using UnityEngine.Pool;
+using UnityEngine;
 
 namespace CatCode.PlayerLoops
 {
@@ -13,21 +13,20 @@ namespace CatCode.PlayerLoops
     {
         private struct Entry
         {
-            public Action action;
-            public CancellationToken cancellationToken;
-            public CallbackData onCanceled;
+            public Action Action;
+            public CancellationToken CancellationToken;
+            public CallbackData OnCanceled;
 
             public Entry(Action action, CancellationToken cancellationToken)
             {
-                this.action = action;
-
-                onCanceled = CallbackData.Empty;
-
-                this.cancellationToken = cancellationToken;
+                Action = action;
+                OnCanceled = CallbackData.Empty;
+                CancellationToken = cancellationToken;
             }
         }
 
-        private readonly DeferredDenseArray<Entry> _denseArray;        
+        private readonly DeferredDenseArray<Entry> _denseArray;
+        private readonly Queue<CallbackData> _finishedQueue = new();
 
         public TokenLoopRunner(int capacity = 32)
         {
@@ -36,45 +35,75 @@ namespace CatCode.PlayerLoops
 
         public ElementHandle Schedule(Action action, CancellationToken token)
         {
-            var entry = new Entry(action, token);            
+            var entry = new Entry(action, token);
             return _denseArray.Add(entry);
         }
 
 
         public void SetOnCanceled(ElementHandle handle, Action onCanceled)
-            => _denseArray[handle].onCanceled = CallbackData.Create(onCanceled);
+        {
+            if (_denseArray.TryGetIndex(handle, out var index))
+                _denseArray[index].OnCanceled = CallbackData.Create(onCanceled);
+        }
 
         public void SetOnCanceled<T>(ElementHandle handle, T state, Action<T> onCanceled) where T : class
-            => _denseArray[handle].onCanceled = CallbackData.Create(state, onCanceled);
+        {
+            if (_denseArray.TryGetIndex(handle, out var index))
+                _denseArray[index].OnCanceled = CallbackData.Create(state, onCanceled);
+        }
 
 
         public void Run()
         {
-            var queueHandle = UnsafeGenericPool<Queue<CallbackData>>.Get(out var finishedQueue);
+            if (_denseArray.TotalCount == 0)
+                return;
+
             _denseArray.ApplyAdd();
 
             var count = _denseArray.Count;
             for (int i = 0; i < count; i++)
             {
-                var element = _denseArray[i];
-                if (element.cancellationToken.IsCancellationRequested)
+                ref readonly var element = ref _denseArray[i];
+                if (element.CancellationToken.IsCancellationRequested)
                 {
-                    finishedQueue.Enqueue(element.onCanceled);
+                    if (!element.OnCanceled.IsEmpty)
+                        _finishedQueue.Enqueue(element.OnCanceled);
+
                     _denseArray.RemoveAt(i);
+                    continue;
                 }
-                else
-                    element.action();
+
+                try
+                {
+                    element.Action();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                }
             }
 
             _denseArray.ApplyRemove();
 
-            foreach (var data in finishedQueue)
-                data.Invoke();
-
-            finishedQueue.Clear();
+            while (_finishedQueue.Count > 0)
+            {
+                try
+                {
+                    _finishedQueue.Dequeue().Invoke();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                }
+            }
         }
 
         public bool IsValid(ElementHandle handle) => _denseArray.IsValid(handle);
+
+        // Active until the token is canceled, without waiting for the next Run to remove the task.
+        public bool IsActive(ElementHandle handle)
+            => _denseArray.TryGetIndex(handle, out var index)
+               && !_denseArray[index].CancellationToken.IsCancellationRequested;
 
         public RunnerMetrics GetMetrics()
             => new(_denseArray.Count, _denseArray.PendingCount, _denseArray.TotalCount);

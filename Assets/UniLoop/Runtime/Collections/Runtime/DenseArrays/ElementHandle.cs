@@ -1,18 +1,15 @@
 ﻿
 namespace CatCode.PlayerLoops.Collections
 {
-    /// <summary>
-    /// Lightweight handle referencing an element inside the dense array.
-    /// </summary>
-    public struct ElementHandle
+    public readonly struct ElementHandle
     {
-        public int id;
-        public int generation;
+        public readonly int Id;
+        public readonly int Generation;
 
         public ElementHandle(int id, int generation)
         {
-            this.id = id;
-            this.generation = generation;
+            Id = id;
+            Generation = generation;
         }
     }
 }

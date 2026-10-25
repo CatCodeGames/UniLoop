@@ -11,7 +11,7 @@ namespace CatCode.PlayerLoops
         private readonly IWhileController _runner;
         private readonly ElementHandle _handle;
 
-        public bool IsDisposed => _runner == null || !_runner.IsValid(_handle);
+        public bool IsDisposed => _runner == null || !_runner.IsActive(_handle);
 
         public WhileHandle(IWhileController runner, ElementHandle handle)
         {
@@ -22,15 +22,13 @@ namespace CatCode.PlayerLoops
 
         public WhileHandle SetOnCompleted(Action action)
         {
-            if (!IsDisposed)
-                _runner.SetOnCompleted(_handle, action);
+            _runner?.SetOnCompleted(_handle, action);
             return this;
         }
 
         public WhileHandle SetOnCanceled(Action action)
         {
-            if (!IsDisposed)
-                _runner.SetOnCanceled(_handle, action);
+            _runner?.SetOnCanceled(_handle, action);
             return this;
         }
 
@@ -42,25 +40,20 @@ namespace CatCode.PlayerLoops
             => SetOnCanceled(state, action);
 
 
-        public WhileHandle SetOnCompleted<T>(T state, Action<T> action ) where T : class
+        public WhileHandle SetOnCompleted<T>(T state, Action<T> action) where T : class
         {
-            if (!IsDisposed)
-                _runner.SetOnCompleted(_handle, state, action);
+            _runner?.SetOnCompleted(_handle, state, action);
             return this;
         }
 
         public WhileHandle SetOnCanceled<T>(T state, Action<T> action) where T : class
         {
-            if (!IsDisposed)
-                _runner.SetOnCanceled(_handle, state, action);
+            _runner?.SetOnCanceled(_handle, state, action);
             return this;
         }
 
 
         public void Dispose()
-        {
-            if (!IsDisposed)
-                _runner.Cancel(_handle);
-        }
+            => _runner?.Cancel(_handle);
     }
 }

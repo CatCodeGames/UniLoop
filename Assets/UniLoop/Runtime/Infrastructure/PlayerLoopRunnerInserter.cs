@@ -23,7 +23,7 @@ namespace CatCode.PlayerLoops
             _bindings = bindings;
         }
 
-        internal void InserRunners()
+        internal void InsertRunners()
         {
             if (_inserted || _disposed)
                 return;

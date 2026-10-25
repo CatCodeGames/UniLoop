@@ -1,4 +1,4 @@
-﻿using CatCode.PlayerLoops.Collections;
+using CatCode.PlayerLoops.Collections;
 using System;
 
 namespace CatCode.PlayerLoops
@@ -8,21 +8,18 @@ namespace CatCode.PlayerLoops
     /// </summary>
     public readonly struct SlimLoopHandle : IDisposable
     {
-        private readonly ISlimLoopContoller _runner;
+        private readonly ISlimLoopController _runner;
         private readonly ElementHandle _handle;
 
-        public bool IsDisposed => _runner == null || !_runner.IsValid(_handle);
+        public bool IsDisposed => _runner == null || !_runner.IsActive(_handle);
 
-        public SlimLoopHandle(ISlimLoopContoller runner, ElementHandle handle)
+        public SlimLoopHandle(ISlimLoopController runner, ElementHandle handle)
         {
             _runner = runner;
             _handle = handle;
         }
-
+                
         public void Dispose()
-        {
-            if(!IsDisposed)
-                _runner.Cancel(_handle);
-        }
+            => _runner?.Cancel(_handle);
     }
 }

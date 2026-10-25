@@ -7,10 +7,12 @@ namespace CatCode.PlayerLoops.Tests
     public class DeferredDenseArrayStressTests
     {
         [Test]
-        public void Stress_RemoveOperations()
+        public void Stress_RandomRemove()
         {
             const int ElementsCount = 100;
             const int RemoveCount = 10;
+
+            UnityEngine.Random.InitState(0);
 
             var arr = new DeferredDenseArray<int>(8);
 
@@ -70,8 +72,10 @@ namespace CatCode.PlayerLoops.Tests
 
 
         [Test]
-        public void Stress_AddRemove_Batches_MultipleCycles()
+        public void Stress_AddRemoveCycles()
         {
+            UnityEngine.Random.InitState(0);
+
             var arr = new DeferredDenseArray<int>(16);
 
             var items = new List<(int Value, ElementHandle Handle)>();

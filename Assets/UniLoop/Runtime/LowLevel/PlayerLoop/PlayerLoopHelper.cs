@@ -10,6 +10,7 @@ namespace CatCode.PlayerLoops.LowLevel
     {
         /// <summary>
         /// Inserts multiple systems into the PlayerLoop.
+        /// A system of the same type already present in the parent is replaced, so repeated calls never duplicate it.
         /// </summary>
         public static void InsertLoopSystems(PlayerLoopInsertRequest[] requests)
         {
@@ -37,20 +38,19 @@ namespace CatCode.PlayerLoops.LowLevel
         }
 
         public static PlayerLoopSystem GetCurrentPlayerLoop()
-        {
-#if UNITY_2019_3_OR_NEWER
-            return PlayerLoop.GetCurrentPlayerLoop();
-#else
-            return PlayerLoop.GetDefaultPlayerLoop();
-#endif
-        }
+            => PlayerLoop.GetCurrentPlayerLoop();
 
         private static void InsertLoopSystem(ref PlayerLoopSystem parentSystem, PlayerLoopInsertRequest request)
         {
             if (!TryFindSubLoopSystemIndex(ref parentSystem, request.ParentType, out var index))
-                throw new Exception("Target PlayerLoopSystem does not found. Type:" + request.ParentType.FullName);
+                throw new Exception("Target PlayerLoopSystem was not found. Type: " + request.ParentType.FullName);
 
             var sourceSystem = parentSystem.subSystemList[index];
+
+            // With Domain Reload disabled the PlayerLoop survives between Play Mode sessions.
+            // If the previous cleanup did not run, the old system is still there and must not be doubled.
+            TryRemoveSubSystem(ref sourceSystem, request.System.type);
+
             InsertLoopSystem(ref sourceSystem, request.System, request.TargetType, request.Position);
             parentSystem.subSystemList[index] = sourceSystem;
         }
@@ -141,19 +141,6 @@ namespace CatCode.PlayerLoops.LowLevel
 
                 break;
             }
-        }
-
-        private static void RemoveSystemRecursive(ref PlayerLoopSystem parent, Type targetSystemType)
-        {
-            var subSystems = parent.subSystemList;
-
-            if (subSystems == null || subSystems.Length == 0)
-                return;
-
-            for (int i = 0; i < subSystems.Length; i++)
-                RemoveSystemRecursive(ref subSystems[i], targetSystemType);
-
-            TryRemoveSubSystem(ref parent, targetSystemType);
         }
 
         private static bool TryRemoveSubSystem(ref PlayerLoopSystem parent, Type targetSystemType)

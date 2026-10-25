@@ -9,5 +9,6 @@ namespace CatCode.PlayerLoops
         public void SetOnCanceled<T>(ElementHandle handle, T state, Action<T> onCanceled) where T : class;
 
         public bool IsValid(ElementHandle handle);
+        public bool IsActive(ElementHandle handle);
     }
 }

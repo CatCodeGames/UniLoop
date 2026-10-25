@@ -3,10 +3,8 @@
 namespace CatCode.PlayerLoops
 {
     /// <summary>
-    /// Registry that stores PlayerLoop runners for every timing–phase pair
-    /// and provides indexed access and snapshot generation.
+    /// Registry that stores PlayerLoop runners for every timing–phase pair and provides indexed access.
     /// </summary>
-
     internal class PlayerLoopRunnerRegistry
     {
         private readonly PlayerLoopRunner[] _runners;
@@ -30,26 +28,6 @@ namespace CatCode.PlayerLoops
 
 
         private int PositionToIndex(PlayerLoopTiming timing, PlayerLoopPhase phase)
-            => PositionToIndex((int)timing, (int)phase);
-
-        private int PositionToIndex(int timingIndex, int phaseIndex)
-            => timingIndex * _phasesPerTiming + phaseIndex;
-
-        private PlayerLoopRunnerPosition IndexToPosition(int index)
-            => new((PlayerLoopTiming)(index / _phasesPerTiming), (PlayerLoopPhase)(index % _phasesPerTiming));
-
-
-        public TimingRunnerSnapshot[] GetSnapshot()
-        {
-            TimingRunnerSnapshot[] snapshots = new TimingRunnerSnapshot[_runners.Length];
-            for (int i = 0; i < _runners.Length; i++)
-            {
-                var position = IndexToPosition(i);
-                var processorSnapshots = _runners[i].GetSnapshots();
-                var runnerSnapshot = new TimingRunnerSnapshot(position, processorSnapshots);
-                snapshots[i] = runnerSnapshot;
-            }
-            return snapshots;
-        }
+            => (int)timing * _phasesPerTiming + (int)phase;
     }
 }

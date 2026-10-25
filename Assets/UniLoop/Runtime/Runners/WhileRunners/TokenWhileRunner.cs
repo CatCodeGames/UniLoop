@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using UnityEngine.Pool;
+using UnityEngine;
 
 namespace CatCode.PlayerLoops
 {
@@ -13,24 +13,22 @@ namespace CatCode.PlayerLoops
     {
         private struct Entry
         {
-            public Func<bool> predicate;
-            public CancellationToken cancellationToken;
-
-            public CallbackData onCompleted;
-            public CallbackData onCanceled;
+            public Func<bool> Predicate;
+            public CancellationToken CancellationToken;
+            public CallbackData OnCompleted;
+            public CallbackData OnCanceled;
 
             public Entry(Func<bool> predicate, CancellationToken cancellationToken)
             {
-                this.predicate = predicate;
-
-                onCompleted = CallbackData.Empty;
-                onCanceled = CallbackData.Empty;
-
-                this.cancellationToken = cancellationToken;
+                Predicate = predicate;
+                OnCompleted = CallbackData.Empty;
+                OnCanceled = CallbackData.Empty;
+                CancellationToken = cancellationToken;
             }
         }
 
         private readonly DeferredDenseArray<Entry> _denseArray;
+        private readonly Queue<CallbackData> _finishedQueue = new();
 
         public TokenWhileRunner(int capacity = 32)
         {
@@ -45,44 +43,85 @@ namespace CatCode.PlayerLoops
 
 
         public void SetOnCompleted(ElementHandle handle, Action onCompleted)
-            => _denseArray[handle].onCompleted = CallbackData.Create(onCompleted);        
+        {
+            if (_denseArray.TryGetIndex(handle, out var index))
+                _denseArray[index].OnCompleted = CallbackData.Create(onCompleted);
+        }
+
         public void SetOnCompleted<T>(ElementHandle handle, T state, Action<T> onCompleted) where T : class
-            => _denseArray[handle].onCompleted = CallbackData.Create(state, onCompleted);
+        {
+            if (_denseArray.TryGetIndex(handle, out var index))
+                _denseArray[index].OnCompleted = CallbackData.Create(state, onCompleted);
+        }
 
         public void SetOnCanceled(ElementHandle handle, Action onCanceled)
-            => _denseArray[handle].onCanceled = CallbackData.Create(onCanceled);        
+        {
+            if (_denseArray.TryGetIndex(handle, out var index))
+                _denseArray[index].OnCanceled = CallbackData.Create(onCanceled);
+        }
+
         public void SetOnCanceled<T>(ElementHandle handle, T state, Action<T> onCanceled) where T : class
-            => _denseArray[handle].onCanceled = CallbackData.Create(state, onCanceled);
+        {
+            if (_denseArray.TryGetIndex(handle, out var index))
+                _denseArray[index].OnCanceled = CallbackData.Create(state, onCanceled);
+        }
 
 
         public void Run()
         {
-            var queueHandle = UnsafeGenericPool<Queue<CallbackData>>.Get(out var finishedQueue);
+            if (_denseArray.TotalCount == 0)
+                return;
+
             _denseArray.ApplyAdd();
 
             var count = _denseArray.Count;
             for (int i = 0; i < count; i++)
             {
-                ref var element = ref _denseArray[i];
-                if (element.cancellationToken.IsCancellationRequested)
+                ref readonly var element = ref _denseArray[i];
+                if (element.CancellationToken.IsCancellationRequested)
                 {
-                    finishedQueue.Enqueue(element.onCanceled);
+                    if (!element.OnCanceled.IsEmpty)
+                        _finishedQueue.Enqueue(element.OnCanceled);
+
                     _denseArray.RemoveAt(i);
                     continue;
                 }
-                if (!element.predicate())
+
+                bool isRunning;
+                try
                 {
-                    finishedQueue.Enqueue(element.onCompleted);
+                    isRunning = element.Predicate();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                    continue;
+                }
+
+                if (!isRunning)
+                {
+                    // The predicate may grow the array, so the element is read again instead of using the old ref.
+                    ref readonly var onCompleted = ref _denseArray[i].OnCompleted;
+                    if (!onCompleted.IsEmpty)
+                        _finishedQueue.Enqueue(onCompleted);
+
                     _denseArray.RemoveAt(i);
                 }
             }
 
             _denseArray.ApplyRemove();
 
-            foreach (var data in finishedQueue)
-                data.Invoke();
-
-            finishedQueue.Clear();
+            while (_finishedQueue.Count > 0)
+            {
+                try
+                {
+                    _finishedQueue.Dequeue().Invoke();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                }
+            }
         }
 
 
@@ -91,5 +130,9 @@ namespace CatCode.PlayerLoops
 
         public bool IsValid(ElementHandle handle)
             => _denseArray.IsValid(handle);
+                
+        public bool IsActive(ElementHandle handle)
+            => _denseArray.TryGetIndex(handle, out var index)
+               && !_denseArray[index].CancellationToken.IsCancellationRequested;
     }
 }

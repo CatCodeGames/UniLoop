@@ -11,7 +11,8 @@ namespace CatCode.PlayerLoops
         private readonly ILoopController _runner;
         private readonly ElementHandle _handle;
 
-        public bool IsDisposed => _runner == null || !_runner.IsValid(_handle);
+        public bool IsDisposed => _runner == null || !_runner.IsActive(_handle);
+
 
         public LoopHandle(ILoopController runner, ElementHandle handle)
         {
@@ -22,8 +23,7 @@ namespace CatCode.PlayerLoops
 
         public LoopHandle SetOnCanceled(Action action)
         {
-            if (!IsDisposed)
-                _runner.SetOnCanceled(_handle, action);
+            _runner?.SetOnCanceled(_handle, action);
             return this;
         }
 
@@ -32,16 +32,12 @@ namespace CatCode.PlayerLoops
 
         public LoopHandle SetOnCanceled<T>(T state, Action<T> action) where T : class
         {
-            if (!IsDisposed)
-                _runner.SetOnCanceled(_handle, state, action);
+            _runner?.SetOnCanceled(_handle, state, action);
             return this;
         }
 
 
         public void Dispose()
-        {
-            if (!IsDisposed)
-                _runner.Cancel(_handle);
-        }
+            => _runner?.Cancel(_handle);
     }
 }

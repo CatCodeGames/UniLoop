@@ -15,15 +15,6 @@ namespace CatCode.PlayerLoops.Tests
                 yield return instruction;
         }
 
-        public static IEnumerator WaitFramePhase(PlayerLoopTiming timing, PlayerLoopPhase phase)
-        {
-            if (phase == PlayerLoopPhase.Late)
-            {
-                var instruction = GetInstruction(timing);
-                yield return instruction;
-            }
-        }
-
         private static YieldInstruction GetInstruction(PlayerLoopTiming timing)
         {
             return timing switch

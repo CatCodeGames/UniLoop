@@ -1,10 +1,11 @@
-﻿using CatCode.PlayerLoops.Collections;
+using CatCode.PlayerLoops.Collections;
 
 namespace CatCode.PlayerLoops
 {
-    public interface ISlimLoopContoller
+    public interface ISlimLoopController
     {
         bool IsValid(ElementHandle handle);
         void Cancel(ElementHandle handle);
+        bool IsActive(ElementHandle handle);
     }
 }
